@@ -55,7 +55,7 @@ _For an approved-plan handoff, derive these from the task block instead of askin
 
 ## Step 1: RED (Failing Test)
 
-_If JavaScript/TypeScript, read `${CLAUDE_SKILL_DIR}/references/js-ts-patterns.md` fully._
+_If JavaScript/TypeScript, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/references/js-ts-patterns.md` fully._
 
 1. Write the smallest test for one behavior.
 2. Stub the implementation (e.g. `return null`) — just enough to compile/run.
@@ -66,7 +66,7 @@ _If JavaScript/TypeScript, read `${CLAUDE_SKILL_DIR}/references/js-ts-patterns.m
 
 ## Step 2: GREEN (Make It Pass)
 
-_If unsure how minimal is minimal, read `${CLAUDE_SKILL_DIR}/references/minimal-impl-examples.md` fully (examples are Python; the principle applies to any language)._
+_If unsure how minimal is minimal, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/references/minimal-impl-examples.md` fully (examples are Python; the principle applies to any language)._
 
 1. Checkpoint the working tree before editing.
 2. Write the smallest implementation that satisfies the test — no speculative generality.

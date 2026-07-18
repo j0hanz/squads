@@ -2,7 +2,7 @@
 
 ![Version](https://img.shields.io/github/package-json/v/j0hanz/squads?style=for-the-badge&label=version)
 
-A Claude Code plugin with skills for collaborative software development. Each skill covers one stage of the development lifecycle, from brainstorming and planning through implementation, debugging, and code review.
+A multi-agent workflow plugin with eight skills that hand off along one lifecycle.
 
 ## Features
 
@@ -49,27 +49,6 @@ user request → dispatch-agents (Step 0 Triage: pick workflow + fleet)
   ├─ bulk / audit  → dispatch-agents patterns (fan out, adversarial verify, loop until done)
   └─ verified diff → request-code-review → receive-code-review → commit / PR
 ```
-
-## Development
-
-These are for contributors working on the plugin itself, not for using it.
-
-### Prerequisites
-
-- Node.js ≥ 22 and npm — only for Prettier formatting.
-- Python 3 — only for the skill linter.
-
-### Scripts
-
-| Command                         | Description                                                        |
-| ------------------------------- | ------------------------------------------------------------------ |
-| `npm run format`                | Format every file with Prettier (`prettier --write .`)             |
-| `npm run format:check`          | Check formatting without writing                                   |
-| `python scripts/lint_skills.py` | Validate SKILL.md frontmatter, relative links, and contract tokens |
-
-## Contributing
-
-This repo has no `CONTRIBUTING.md` yet. To contribute, open an issue or pull request against [`j0hanz/squads`](https://github.com/j0hanz/squads), and run `python scripts/lint_skills.py` and `npm run format:check` before submitting.
 
 ## License
 

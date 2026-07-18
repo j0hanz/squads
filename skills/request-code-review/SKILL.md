@@ -37,7 +37,7 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 
 1. Fill dispatch prompt below, dispatch one subagent, write/edit tools denied. `{{plan_summary}}` = one-two sentences stating change's intent, taken from plan task or commit message(s) in `"$base".."$head"`; neither exists → derive from diff before dispatching. `{{diff}}` = diff captured Step 1.
 2. Subagent must return these headers exactly: `## Code Review Result`, `**Status**: PASS|FAIL`, `### Blocking Issues`, `### Advisory Issues`, `### What Was Checked`.
-3. Header missing or malformed → retry once w/ reminder; second failure aborts review.
+3. Header missing or malformed → retry once with reminder; second failure aborts review.
 4. **Done when:** subagent returns well-formed output, all required headers.
 
 #### Dispatch prompt

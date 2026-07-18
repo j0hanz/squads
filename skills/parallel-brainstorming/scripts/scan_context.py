@@ -16,7 +16,9 @@ from __future__ import annotations
 
 import argparse
 import ast
+import fnmatch
 import json
+import os
 import re
 import subprocess
 import sys
@@ -59,7 +61,7 @@ _DOC_GLOBS = [
     "decisions/*.md",
     "docs/design/*.md",
 ]
-_CONSTRAINT_PATTERNS = ["TODO", "FIXME", "HACK", "rate.limit", "timeout", "max_size"]
+_CONSTRAINT_PATTERNS = ["TODO", "FIXME", "HACK", "rate_limit", "rate limit", "ratelimit", "timeout", "max_size"]
 
 # Adjacent synonyms for common domain verbs/nouns used in analogous feature detection
 _SYNONYM_MAP: dict[str, list[str]] = {
@@ -138,7 +140,6 @@ def _git_log(path: str, cwd: Path) -> str:
 
 def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
     """Return file paths matching pattern, or None if no grep tool is available."""
-    found_git = True
     try:
         git_result = subprocess.run(
             ["git", "grep", "-ril", "-e", pattern],
@@ -149,15 +150,21 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
         )
         if git_result.returncode == 0:
             return [p for p in git_result.stdout.splitlines() if p]
+        if git_result.returncode == 1:
+            # healthy git, zero matches — do not fall through to rg
+            return []
         if git_result.returncode > 1:
             print(
                 f"warning: git grep failed for {pattern!r}: {git_result.stderr.strip()}",
                 file=sys.stderr,
             )
     except FileNotFoundError:
-        found_git = False
-    except subprocess.TimeoutExpired:
         pass
+    except subprocess.TimeoutExpired:
+        print(
+            f"warning: git grep timed out for {pattern!r}; falling back to rg",
+            file=sys.stderr,
+        )
 
     # Fallback to rg
     try:
@@ -180,9 +187,10 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
             timeout=_SUBPROCESS_TIMEOUT,
         )
     except FileNotFoundError:
-        return None if not found_git else []
+        return None
     except subprocess.TimeoutExpired:
-        return []
+        print(f"warning: search timed out for {pattern!r}", file=sys.stderr)
+        return None
 
     paths = [p for p in rg_result.stdout.splitlines() if p]
     normalized: list[str] = []
@@ -200,15 +208,19 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
 
 
 def _find_doc_files(cwd: Path) -> list[str]:
-    found: list[str] = []
-    for glob in _DOC_GLOBS:
-        for p in cwd.rglob(glob):
-            if any(part in _SKIP_DIRS for part in p.relative_to(cwd).parts):
-                continue
-            found.append(str(p.relative_to(cwd)))
-            if len(found) >= 5:
-                return found
-    return found
+    buckets: list[list[str]] = [[] for _ in _DOC_GLOBS]
+    for root, dirnames, filenames in os.walk(cwd):
+        # prune skip-dirs in place; sorted for run-to-run determinism
+        dirnames[:] = sorted(d for d in dirnames if d not in _SKIP_DIRS)
+        rel_root = Path(root).relative_to(cwd)
+        for name in sorted(filenames):
+            rel = (rel_root / name).as_posix()
+            for i, g in enumerate(_DOC_GLOBS):
+                if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, "*/" + g):
+                    buckets[i].append(str(rel_root / name))
+                    break
+    found = [p for bucket in buckets for p in bucket]
+    return found[:5]  # 5: matches the original cap
 
 
 def _find_test_file(file_path: Path, cwd: Path) -> str:
@@ -318,7 +330,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     # ── Phase 1: parallel grep + doc discovery ──────────────────────────────
     seen_paths: set[str] = set()
     adjacent_paths: set[str] = set()
-    grep_unavailable = False
+    search_failed: list[str] = []
 
     with ThreadPoolExecutor(max_workers=8) as pool:
         # Submit in noun order; iterate results in the same order (not
@@ -329,20 +341,20 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         ]
         doc_future = pool.submit(_find_doc_files, cwd)
 
-        for _noun, fut in grep_futures:
+        for noun, fut in grep_futures:
             paths = fut.result()
             if paths is None:
-                grep_unavailable = True
+                search_failed.append(noun)
                 continue
             for path_str in paths:
                 if path_str not in seen_paths:
                     seen_paths.add(path_str)
                     result.related_files.append(FileSignal(path=path_str))
 
-        for _noun, fut in adjacent_futures:
+        for noun, fut in adjacent_futures:
             paths = fut.result()
             if paths is None:
-                grep_unavailable = True
+                search_failed.append(noun)
                 continue
             for path_str in paths:
                 if path_str not in seen_paths and path_str not in adjacent_paths:
@@ -352,9 +364,11 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         if not result.design_docs:
             result.unknowns.append("No glossary, ADR, or architecture docs found")
 
-    if grep_unavailable:
+    if search_failed:
         result.unknowns.append(
-            "Neither git nor rg is available — file search was skipped"
+            "search unavailable or timed out for: "
+            + ", ".join(search_failed)
+            + " — file coverage incomplete"
         )
 
     # Scope must reflect everything that matched, not the capped report list

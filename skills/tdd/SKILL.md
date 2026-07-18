@@ -1,6 +1,7 @@
 ---
 name: tdd
-description: 'Use when new logic requires implementation, or when a TDD red flag appears — a trivially passing test, code written before its test, or GREEN with no observed RED. Not for multi-task work without an approved plan — use request-plan first.'
+description: Use when new logic requires implementation, or when a TDD red flag appears — a trivially passing test, code written before its test, or GREEN with no observed RED. Not for multi-task work without an approved plan — use request-plan first.
+argument-hint: "[feature or behavior to implement]"
 ---
 
 # tdd
@@ -9,7 +10,7 @@ Autonomous TDD execution. **HARD GATE:** No implementation code WITHOUT a failin
 
 ## When NOT to use TDD
 
-Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Pick from the three categories below:
+Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS or zero-logic boilerplate; then skip TDD and state the category and reason in the structured return. Pick from the three categories below:
 
 1. **Recommended** — Skip TDD: [matching category] because [specific reason].
 2. **Alternative** — Use full TDD anyway + reason the escape hatch doesn't apply.
@@ -58,13 +59,13 @@ _For an approved-plan handoff, derive these from the task block instead of askin
 - Provide 2-3 call-site examples.
 - State the target test file path.
 - Start the **behavior list**: happy path + the enumerated errors; it grows by one edge case per RED cycle and is the coverage gauge for REFACTOR.
-- **Gate:** run the relevant existing tests first — establish a clean baseline before adding new tests.
+- **Gate:** run the relevant existing tests first — establish a clean baseline before adding new tests. If the baseline is RED, stop: route the pre-existing failure to `parallel-debugging`, or get user confirmation to proceed with the failing tests recorded and excluded from this cycle's GREEN criterion.
 
 **Done when:** interface details, errors, and test path are locked and user confirms.
 
 ## Step 1: RED (Failing Test)
 
-_If JavaScript/TypeScript, read `references/js-ts-patterns.md` fully._
+_If JavaScript/TypeScript, read `${CLAUDE_SKILL_DIR}/references/js-ts-patterns.md` fully._
 
 1. Write the smallest test for one behavior.
 2. Stub the implementation (e.g. `return null`) — just enough to compile/run.
@@ -75,13 +76,13 @@ _If JavaScript/TypeScript, read `references/js-ts-patterns.md` fully._
 
 ## Step 2: GREEN (Make It Pass)
 
-_If unsure how minimal is minimal, read `references/minimal-impl-examples.md` fully._
+_If unsure how minimal is minimal, read `${CLAUDE_SKILL_DIR}/references/minimal-impl-examples.md` fully._
 
 1. Checkpoint the working tree before editing.
 2. Write the smallest implementation that satisfies the test — no speculative generality.
 3. No code added "just in case" — only what the current test requires.
-4. 3 failed attempts on the same test → restart with a smaller test.
-5. Still stuck → escalate to `parallel-debugging` (reproduce and re-isolate the root cause) or `request-plan` (if the design itself is wrong).
+4. 3 failed attempts on the same test → restart with a smaller test (at most 2 restarts).
+5. After the 2nd restart also fails 3 attempts → escalate to `parallel-debugging` (reproduce and re-isolate the root cause) or `request-plan` (if the design itself is wrong).
 
 ### N-1 Test (False-Green Elimination)
 
@@ -122,6 +123,12 @@ Any of these signals means you have left TDD. The fix is the same every time: de
 
 **All of these mean:** delete the code-first implementation, re-enter the cycle at RED, and run the test to confirm it fails before re-implementing.
 
-## Next Steps
+## Next Skills
 
-On full behavior-list coverage and a clean REFACTOR, run the full test suite one final time and report the results.
+On full behavior-list coverage and a clean REFACTOR, run the full test suite one final time and report the results. If the final run fails: a failure in the behavior just built re-enters the cycle at RED; an unrelated new failure routes to `parallel-debugging`. Never report done over a failing suite.
+
+| Skill                                                  | Use Case                                                       |
+| :----------------------------------------------------- | :------------------------------------------------------------- |
+| [request-code-review](../request-code-review/SKILL.md) | Fresh-eye review of the completed diff                         |
+| [parallel-debugging](../parallel-debugging/SKILL.md)   | Stuck GREEN (Step 2 escalation) or unrelated final-run failure |
+| [request-plan](../request-plan/SKILL.md)               | Design itself proved wrong mid-cycle                           |

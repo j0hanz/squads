@@ -1,6 +1,7 @@
 ---
 name: parallel-brainstorming
-description: "Use when requirements are vague or the solution space is open before a plan exists. Prefer over request-plan when two or more distinct architectural approaches are in play."
+description: Use when requirements are vague or the solution space is open before a plan exists. Prefer over request-plan when two or more distinct architectural approaches are in play.
+argument-hint: "[feature request or problem to explore]"
 ---
 
 # parallel-brainstorming
@@ -11,6 +12,7 @@ request until Phase 6 produces a Design Brief for an approach the user locked in
 if Phase 5 ran, that Phase 5 marked `APPROVED`). Sketching approach in doc is still
 design work — needs Phase 1 Discovery first. Doesn't apply to bug fixes, typos, one-line
 config changes with no design space.
+When in doubt whether the request is a bug fix or a feature, treat it as design work and run Phase 1 — the bug-fix exemption must not be used to skip Discovery.
 </HARD-GATE>
 
 ## Process Flow
@@ -26,16 +28,16 @@ config changes with no design space.
 - **Zero-Code Check:** Stop and offer exit if existing code/config already solves this.
 - **Understanding Lock:** Summarize problem and understanding. Only ask user (via `AskUserQuestion`) if genuine doubts exist; otherwise proceed to Creative Checkpoint.
 - **Routing:**
-- Scope XL → Offer to break it down.
-- Ambiguous → Go to Phase 2.
-- High Risk / Scope L+ → Set Phase 5 Flag.
+  - Scope XL → offer to split into independent sub-features and re-run this skill per slice; if the user declines, set the Phase 5 flag and continue with the XL scope.
+  - Ambiguous → Go to Phase 2.
+  - High Risk / Scope L+ → Set Phase 5 Flag.
 
 **Done when:** Context Report lists Related Files, Interface Shapes, Design Docs, Analogous Features, Constraints, Scope (S/M/L/XL), and Unknowns, and zero-code check answered.
 
 ## Phase 2: Clarification
 
 - **Resolve with user:** clarify ambiguous terms via `AskUserQuestion` (max 4 per batch), keeping questions to couple options each.
-- **Glossary:** Save resolved definitions to `glossary.md` (never `CONTEXT.md`).
+- **Glossary:** Save resolved definitions to `glossary.md` at the repository root (never `CONTEXT.md`).
 - **Visuals:** Offer diagram only if layout or data flow requires it. Wait for reply.
 
 **Done when:** ambiguous terms resolved with user and saved to `glossary.md`.
@@ -84,7 +86,7 @@ config changes with no design space.
 - **Severity Rating:** High (Blocks deployment), Med (Worse outcome), Low (Minor). Ignore styling/naming.
 - **Resolution:** Record objections. For all High/Med issues, must "Accept & Revise" or "Reject with technical rationale."
 - **Self-Arbitration:** Resolve debates yourself. Mark design `APPROVED`, `REVISE`, or `REJECT`.
-- **Routing:** `APPROVED` → Phase 6. `REVISE` → revise the design to resolve the objections, then re-run Self-Arbitration (loop until `APPROVED` or `REJECT`). `REJECT` → do not proceed to Phase 6; return to Phase 3 to generate a new approach, or if the whole direction is infeasible, stop and report to the user.
+- **Routing:** `APPROVED` → Phase 6. `REVISE` → revise the design to resolve the objections, then re-run Self-Arbitration (loop until `APPROVED` or `REJECT`). `REJECT` → do not proceed to Phase 6; return to Phase 3 to generate a new approach, or if the whole direction is infeasible, stop and report to the user. Cap REVISE at 2 cycles; if the 3rd Self-Arbitration is still not `APPROVED`, treat it as `REJECT` (→ Phase 3 or stop and report to the user).
 
 **Done when:** every High/Med objection is "Accept & Revise" or "Reject with technical rationale", design marked `APPROVED` (→ Phase 6) or `REJECT` (→ Phase 3 or stop) — `REVISE` is not terminal; it loops back through Self-Arbitration.
 
@@ -110,10 +112,10 @@ Request: "add a way for users to save and re-run searches."
 
 ## Strict Rules
 
-- **Blend Ideation:** Keep Phase 3 perspectives distinct; don't bleed into each other until Phase 4 synthesis.
-- **Ship Raw Ideas:** Phase 4 synthesis mandatory. Never present raw brainstormed ideas as final answer.
-- **Accept Empty Rejections:** Require technical reason for any rejected High-severity issue during Phase 5 critique.
-- **No Agent tool for Phase 3 or 5.**
+- **No Blended Ideation:** Keep Phase 3 perspectives distinct; don't bleed into each other until Phase 4 synthesis.
+- **Never Ship Raw Ideas:** Phase 4 synthesis mandatory. Never present raw brainstormed ideas as final answer.
+- **No Empty Rejections:** Require technical reason for any rejected High-severity issue during Phase 5 critique.
+- **No Agent-tool subagents for Phase 3 or 5.**
 
 ## Next Skills
 

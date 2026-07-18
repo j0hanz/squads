@@ -1,58 +1,8 @@
 # TDD Patterns for JavaScript and TypeScript
 
-## Test Runner Equivalents
-
-| Python (pytest)             | JavaScript (Jest/Vitest)       |
-| --------------------------- | ------------------------------ |
-| `def test_foo():`           | `test('foo', () => { ... })`   |
-| `assert x == y`             | `expect(x).toBe(y)`            |
-| `pytest.raises(ValueError)` | `expect(() => fn()).toThrow()` |
-| `pytest test_foo.py`        | `npx jest foo.test.ts`         |
-| `ModuleNotFoundError`       | `Cannot find module './foo'`   |
-| `AssertionError`            | `Expected X to equal Y`        |
-
 ## Basic RED-GREEN Cycle
 
-**Step 1 — Write the failing test first:**
-
-```typescript
-// discount.test.ts (written before discount.ts exists)
-import { calculateDiscount } from './discount';
-
-test('applies 10% discount to base price', () => {
-  expect(calculateDiscount(100, 10)).toBe(90);
-});
-```
-
-**Run: RED — environment failure**
-
-`Cannot find module './discount' from 'discount.test.ts'`
-
-**Step 2 — Create stub:**
-
-```typescript
-// discount.ts
-export function calculateDiscount(price: number, discountPercent: number): number {
-  return 0; // stub
-}
-```
-
-**Run: RED — assertion failure (correct RED state)**
-
-```
-Expected: 90
-Received: 0
-```
-
-**Step 3 — Minimal implementation:**
-
-```typescript
-export function calculateDiscount(price: number, discountPercent: number): number {
-  return price * (1 - discountPercent / 100);
-}
-```
-
-**Run: GREEN**
+Two RED states: `Cannot find module` is environment RED — stub the module until the failure becomes an assertion failure (`Expected: 90, Received: 0`), which is the correct RED to implement against. See the Failure Analysis table below for the full mapping.
 
 ## Describe/It Nesting (when to use)
 
@@ -67,9 +17,8 @@ describe('calculateDiscount', () => {
 });
 ```
 
-// WRONG: describe used to batch unrelated behaviors (still horizontal slicing)
-
 ```typescript
+// WRONG: describe used to batch unrelated behaviors (still horizontal slicing)
 describe('discount module', () => {
   test('calculateDiscount works', () => { ... });
   test('applyPromoCode works', () => { ... });  // different function — own cycle
@@ -98,9 +47,8 @@ test('fetches user', () => {
 });
 ```
 
-// RIGHT — explicitly check assertion reached
-
 ```typescript
+// RIGHT — explicitly check assertion reached
 test('fetches user', async () => {
   expect.assertions(1); // Jest: fails if no assertion runs
   const user = await fetchUser('u-123');
@@ -110,34 +58,11 @@ test('fetches user', async () => {
 
 ## TypeScript: Type Errors as a Form of RED
 
-In TypeScript, a type error is a valid RED state — the type system is failing on your assertion. Treat it the same as an AssertionError:
-
-- Type error on missing property → add the property (environment fix)
-- Type error on wrong return type → fix the impl (logic fix)
-
-Do NOT add `// @ts-ignore` to bypass type failures. Fix the type, just like you'd fix a failing assertion.
-
-```typescript
-// RED — type error IS a failing test
-const result: number = calculateDiscount('100', 10); // TS: Argument of type 'string' is not assignable to 'number'
-
-// GREEN — fix the implementation or the test input
-const result: number = calculateDiscount(100, 10);
-```
+A type error is a valid RED state — treat it like an AssertionError: missing property → environment fix; wrong return type → implementation fix. Never add `// @ts-ignore` to bypass a type failure; fix the type as you would a failing assertion.
 
 ## Mocking at System Boundaries Only
 
-Examples for the Strict Rules mocking rule (mock only true externals):
-
-```typescript
-// RIGHT — mocking an external HTTP call (system boundary)
-jest.mock('./httpClient');
-const mockGet = jest.fn().mockResolvedValue({ id: '123', name: 'Alice' });
-(httpClient.get as jest.Mock) = mockGet;
-
-// WRONG — mocking an internal collaborator
-jest.mock('./userRepository'); // internal class — test the real thing
-```
+Apply SKILL.md's mocking rule in Jest terms: `jest.mock('./httpClient')` (external HTTP boundary) is RIGHT; `jest.mock('./userRepository')` (internal collaborator) is WRONG — test the real thing.
 
 ## Failure Analysis in JavaScript
 

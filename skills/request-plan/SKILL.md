@@ -1,6 +1,6 @@
 ---
 name: request-plan
-description: Use when a new feature or change requires a plan or specification. Not for unproven problems with open solution space — use parallel-brainstorming.
+description: Use when a new feature or change requires a plan or specification. Not when the solution space is open or two or more distinct architectural approaches are in play — use parallel-brainstorming first.
 argument-hint: "[--depth sketch|contract|blueprint] <feature description>"
 ---
 
@@ -47,6 +47,8 @@ Dispatch ideators in ONE message, blind to each other, each given the Step 1 Con
 
 Each ideator produces a lightweight proposal: a short approach summary + a numbered task list, in plain prose. The Canonical Task Block Schema is not required at draft stage.
 
+An ideator returning empty or unusable output is re-dispatched once; if it fails again, proceed with the remaining proposal(s) and record the gap in the synthesis rationale.
+
 **Done when:** all ideators are dispatched in ONE message (contract: 2, blueprint: 3) and each returns a lightweight proposal + numbered task list; or (sketch) the main-thread inline proposal is output.
 
 ## Step 3: Synthesis
@@ -61,9 +63,9 @@ The merged result is written in the Canonical Task Block Schema.
 
 ## Step 4: Write
 
-Save `docs/plan/<kebab-case-feature-name>.specs.md` and `docs/plan/<kebab-case-feature-name>.plan.md` with header `Status: DRAFT`. All task entries use the Canonical Task Block Schema. For `sketch`, the main thread converts the Step 2 plain-prose draft into the schema during this step.
+Save `docs/plan/<kebab-case-feature-name>.specs.md` and `docs/plan/<kebab-case-feature-name>.plan.md` with headers `Status: DRAFT` and `Depth: <sketch|contract|blueprint>` (the Step 0 depth). All task entries use the Canonical Task Block Schema. For `sketch`, the main thread converts the Step 2 plain-prose draft into the schema during this step.
 
-**Done when:** both files exist on disk under `docs/plan/` with `Status: DRAFT` and schema task entries.
+**Done when:** both files exist on disk under `docs/plan/` with `Status: DRAFT` and `Depth:` headers and schema task entries.
 
 ## Step 5: Verification
 
@@ -88,7 +90,7 @@ Required in all final `specs.md` and `plan.md` outputs; ideator proposals are ex
 ```markdown
 ### TASK-NNN: [Action title]
 
-Depends on: [TASK-NNN](#task-nnn-action-title) (comma-separated list: [TASK-001](#task-001-first-task), [TASK-002](#task-002-second-task)) or none — anchors are the slugified task heading (`#task-nnn-<title>`)
+Depends on: [TASK-NNN](#task-nnn-action-title) (comma-separated list: [TASK-001](#task-001-first-task), [TASK-002](#task-002-second-task)) or none — anchors are the slugified task heading (`#task-nnn-<slugified-title>`)
 Files: [path/to/file.ts](path/to/file.ts) (or comma-separated list of workspace-relative paths)
 Symbols: [symbolName](path/to/file.ts#L42) (or comma-separated list of workspace-relative symbol paths)
 Satisfies: REQ-001, REQ-002 (comma-separated list of REQ-NNN IDs declared in specs.md)

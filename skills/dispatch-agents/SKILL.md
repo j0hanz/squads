@@ -1,9 +1,9 @@
 ---
 name: dispatch-agents
-description: Use when deciding whether to delegate work to subagents, before fanning out parallel agents, or when a task exceeds one context window — many independent items, whole-repo sweeps, or unbiased checks.
+description: Use when deciding whether to delegate work to subagents, before fanning out parallel agents, or when a task exceeds one context window — many independent items, whole-repo sweeps, or unbiased checks — or when an APPROVED docs/plan/*.plan.md needs execution. Not for design ideation — use parallel-brainstorming.
 ---
 
-# Dispatch Agents
+# dispatch-agents
 
 ## First: do you need agents at all?
 
@@ -30,18 +30,18 @@ One-shot edits and simple questions never need fleet. When in doubt, stay single
 
 Pick first that fits; compose when task demands it.
 
-| Pattern                  | Shape                                                                       | Use when                                                                   |
-| ------------------------ | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| **Fan out & synthesize** | One agent per independent chunk → barrier → merge with provenance           | Research, audits, due diligence, per-file/per-folder sweeps                |
-| **Adversarial verify**   | Fresh skeptic per finding, prompted to _refute_ it; majority-refuted dies   | Any finding or claim about to be acted on or shipped                       |
-| **Generate & filter**    | One agent overgenerates (40+, not 5) → separate judge scores against rubric | Taste bottlenecks: names, titles, bulk candidate sets                      |
-| **Tournament**           | Pairwise fresh-context matches, winners advance bracket-style               | Ranking large sets without one bloated, biased context                     |
-| **Classify & act**       | Cheap classifier routes each item to its handler; dedupe before acting      | Mixed-type inboxes, triage, heterogeneous queues                           |
-| **Loop until done**      | Keep dispatching rounds until condition holds, not fixed count              | Flaky bugs, unknown-size discovery — stop after 2 consecutive empty rounds |
+| Pattern                  | Shape                                                                                                       | Use when                                                                   |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Fan out & synthesize** | One agent per independent chunk → barrier → merge with provenance                                           | Research, audits, due diligence, per-file/per-folder sweeps                |
+| **Adversarial verify**   | 2+ fresh skeptics per finding, prompted to _refute_ it; dies when a majority refute (tie → add one skeptic) | Any finding or claim about to be acted on or shipped                       |
+| **Generate & filter**    | One agent overgenerates (40+, not 5) → separate judge scores against rubric                                 | Taste bottlenecks: names, titles, bulk candidate sets                      |
+| **Tournament**           | Pairwise fresh-context matches, winners advance bracket-style                                               | Ranking large sets without one bloated, biased context                     |
+| **Classify & act**       | Cheap classifier routes each item to its handler; dedupe before acting                                      | Mixed-type inboxes, triage, heterogeneous queues                           |
+| **Loop until done**      | Keep dispatching rounds until condition holds, not fixed count                                              | Flaky bugs, unknown-size discovery — stop after 2 consecutive empty rounds |
 
 Exploring _design approaches_ isn't a Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there, its ideation phases forbid subagents.
 
-Canonical composition: **fan out → adversarially verify each finding → loop until clean pass finds nothing new**. Dedupe against everything already seen (including rejected findings) between rounds, or it never converges.
+Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) between rounds, or it never converges.
 
 Match model to role: cheap/fast models for classification and mechanical stages, strongest models for judging and verification. One tier rarely fits all seats.
 
@@ -55,6 +55,8 @@ fields drive dispatch — never improvise execution order:
 - **`Files:` decides parallel vs. serial.** Overlapping file lists → serial (or isolated worktrees). Disjoint lists → parallel safe. Reads-parallel/writes-serial invariant applied per task.
 - **`Validate:` is structured return.** Each worker runs task's `Validate:` command, reports exit code and output — task without passing validation isn't done. Failed `Validate:` that's an impl bug (not plan error) routes to `parallel-debugging` to reproduce and isolate root cause before re-fixing; genuinely wrong plan routes to `request-plan`.
 - **`Satisfies:` goes into worker's spec.** Worker gets REQ text it satisfies, so it knows acceptance criterion, not just action.
+
+**Done when:** every task in the plan has been dispatched in dependency order and returned a passing `Validate:` exit code, or a failing task has been routed to `parallel-debugging` (impl bug) / `request-plan` (plan error).
 
 ## Long-running builds
 

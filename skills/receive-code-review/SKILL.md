@@ -35,7 +35,7 @@ description: Use when code review feedback has been received from a human, bot, 
 ## Step 3: Implement
 
 1. If the fix touches 10+ files or core design, get user confirmation first (No Unbounded Scope).
-2. Implement verified fixes one at a time in severity order: blocking/security → correctness → hygiene/typos.
+2. Implement verified fixes one at a time in severity order: blocking/security → correctness → hygiene/typos (from a request-code-review report: all Blocking Issues first, then Advisory Issues split correctness → hygiene).
 
 **Done when:** all verified fixes are implemented, one finding at a time.
 
@@ -47,4 +47,11 @@ description: Use when code review feedback has been received from a human, bot, 
    - **Post-fix test run FAILS** — the fix is wrong or the root cause was misunderstood; hand off to [parallel-debugging](../parallel-debugging/SKILL.md) to reproduce and re-isolate before re-fixing. Do not iterate blindly in Step 3.
    - **Re-review came back FAIL again** — if this is the 3rd pass, mark **BLOCKED**, escalate to the user, and stop; otherwise loop back to Step 1 with the new feedback.
 
-**Done when:** changes are committed and a PR is opened or a re-review is requested, or the user is escalated to.
+**Done when:** changes are committed and a PR is opened or a re-review is requested, or the user is escalated to, or a failing post-fix test run is handed off to parallel-debugging.
+
+## Next Skills
+
+| Skill                                                  | Use Case                                           |
+| :----------------------------------------------------- | :------------------------------------------------- |
+| [request-code-review](../request-code-review/SKILL.md) | Re-review after fixes (pass N, capped at 2)        |
+| [parallel-debugging](../parallel-debugging/SKILL.md)   | Post-fix test run FAILS — reproduce and re-isolate |

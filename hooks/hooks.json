@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus deterministic guards for plan traceability and subagent dispatch hygiene",
+  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate",
   "hooks": {
     "SessionStart": [
       {
@@ -15,16 +15,6 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/plan-check.sh\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
         "matcher": "Task|Agent",
         "hooks": [
           {
@@ -33,15 +23,13 @@
             "timeout": 10
           }
         ]
-      }
-    ],
-    "PostToolUse": [
+      },
       {
-        "matcher": "Write|Edit",
+        "matcher": "Skill|Write|Edit",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/plan-check.sh\"",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/debug-gate.sh\"",
             "timeout": 10
           }
         ]

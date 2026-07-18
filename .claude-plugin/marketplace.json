@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "squads",
-      "description": "A plugin for multi-agent planning, review, and test-driven development",
+      "description": "A plugin for multi-agent workflows like planning, code review, and test-driven development",
       "version": "0.1.0",
       "source": "./",
       "author": {

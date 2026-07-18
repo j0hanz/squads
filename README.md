@@ -41,7 +41,7 @@ When unsure which skill fits, invoke `dispatch-agents` — its triage picks for 
 ### Lifecycle
 
 ```text
-user request → dispatch-agents (triage: pick workflow + fleet)
+user request → dispatch-agents (Step 0 Triage: pick workflow + fleet)
   ├─ open problem  → parallel-brainstorming → request-plan → receive-plan ─┐
   ├─ clear feature → request-plan → receive-plan ─┬──────────────────────┘
   │                                               └→ dispatch-agents (multi-task) / tdd (single task)

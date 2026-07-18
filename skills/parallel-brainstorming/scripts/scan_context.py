@@ -25,6 +25,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import Any
 
 
 @dataclass
@@ -53,6 +54,14 @@ _SKIP_DIRS = frozenset(
     {"venv", ".venv", "node_modules", "__pycache__", ".git", "dist", "build"}
 )
 
+_MAX_LOG_LINES = 3  # 3: recent commit signals decay fast; more lines add noise
+_MAX_CONSTRAINTS = 5  # 5: enough to surface limits without flooding the brief
+_MAX_INTERFACE_SHAPES = (
+    10  # 10: shapes are cheap tokens and often decisive for design
+)
+_MAX_UNKNOWNS = 4  # 4: one per batch; clarifications are capped at 4 per batch
+_MAX_DESIGN_DOCS = 3  # 3: docs rarely add signal beyond the top 3
+
 _DOC_GLOBS = [
     "glossary.md",
     "CONTEXT.md",
@@ -61,6 +70,7 @@ _DOC_GLOBS = [
     "decisions/*.md",
     "docs/design/*.md",
 ]
+_MAX_DOC_DEPTH = 4  # 4: deepest glob is 3 segments + one nesting prefix; bounds the walk on large repos
 _CONSTRAINT_PATTERNS = [
     "TODO",
     "FIXME",
@@ -104,6 +114,34 @@ _LANG_TYPE_PATTERNS: dict[str, str] = {
 }
 
 
+def _dedupe_stable(items: list[Any]) -> list[str]:
+    """Deduplicate preserving first-occurrence order."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in items:
+        item = item if isinstance(item, str) else str(item)
+        key = item.strip().lower()
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+
+def _truncate_git_log(log: str, max_lines: int) -> str:
+    if not log or not log.strip() or log == "no history":
+        return "no history"
+    lines = [line for line in log.splitlines() if line.strip()]
+    truncated = lines[:max_lines]
+    omitted = len(lines) - len(truncated)
+    suffix = f" … +{omitted} more" if omitted > 0 else ""
+    body = "\n".join(truncated)
+    return body + suffix if body else (suffix.strip() or "no history")
+
+
+def _trim_str(value: str, max_chars: int = 200) -> str:
+    return value[:max_chars] + "…" if len(value) > max_chars else value
+
+
 def _sanitize_noun(raw: str) -> str:
     """Strip to alphanumeric/hyphen only; reject empty or flag-like results.
 
@@ -140,7 +178,7 @@ def _git_log(path: str, cwd: Path) -> str:
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return "no history"
     if result.returncode != 0:
         return "no history"
@@ -223,6 +261,8 @@ def _find_doc_files(cwd: Path) -> list[str]:
         # prune skip-dirs in place; sorted for run-to-run determinism
         dirnames[:] = sorted(d for d in dirnames if d not in _SKIP_DIRS)
         rel_root = Path(root).relative_to(cwd)
+        if len(rel_root.parts) >= _MAX_DOC_DEPTH:
+            dirnames[:] = []  # deep enough — stop descending
         for name in sorted(filenames):
             rel = (rel_root / name).as_posix()
             for i, g in enumerate(_DOC_GLOBS):
@@ -286,7 +326,7 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
             tree = ast.parse(
                 file_path.read_text(encoding="utf-8", errors="ignore")
             )
-        except (SyntaxError, OSError):
+        except SyntaxError, OSError:
             return []
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and any(
@@ -346,7 +386,6 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     result = ScanResult(feature_area=" | ".join(nouns))
 
     # ── Phase 1: parallel grep + doc discovery ──────────────────────────────
-    seen_paths: set[str] = set()
     adjacent_paths: set[str] = set()
     search_failed: list[str] = []
 
@@ -362,15 +401,17 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         ]
         doc_future = pool.submit(_find_doc_files, cwd)
 
+        match_counts: dict[str, int] = {}
         for noun, fut in grep_futures:
             paths = fut.result()
             if paths is None:
                 search_failed.append(noun)
                 continue
             for path_str in paths:
-                if path_str not in seen_paths:
-                    seen_paths.add(path_str)
-                    result.related_files.append(FileSignal(path=path_str))
+                match_counts[path_str] = match_counts.get(path_str, 0) + 1
+        seen_paths = set(match_counts)
+        ranked = sorted(match_counts, key=lambda p: -match_counts[p])
+        result.related_files = [FileSignal(path=p) for p in ranked]
 
         for noun, fut in adjacent_futures:
             paths = fut.result()
@@ -408,7 +449,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     # Cap to 5 most relevant files
     result.related_files = result.related_files[
         :5
-    ]  # 5: matches _MAX_FILES in compress_report.py
+    ]  # 5: keep the highest-ranked files (_MAX_FILES)
 
     # Record analogous features (files found only via adjacent synonyms)
     result.analogous_features = sorted(adjacent_paths)[
@@ -491,6 +532,20 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             "No test files found for matched files — test coverage unknown"
         )
 
+    # ── Compress: dedupe + cap low-signal fields for Phase 3 ideation ──────────
+    for f in result.related_files:
+        f.last_commit = _truncate_git_log(f.last_commit, _MAX_LOG_LINES)
+    result.interface_shapes = _dedupe_stable(result.interface_shapes)[
+        :_MAX_INTERFACE_SHAPES
+    ]
+    result.constraints = _dedupe_stable(result.constraints)[:_MAX_CONSTRAINTS]
+    result.design_docs = _dedupe_stable(result.design_docs)[:_MAX_DESIGN_DOCS]
+    result.unknowns = _dedupe_stable(result.unknowns)[:_MAX_UNKNOWNS]
+    result.analogous_features = _dedupe_stable(result.analogous_features)[
+        :2
+    ]  # 2: only seed the Minimalist lane
+    result.scope_reasoning = _trim_str(result.scope_reasoning, 150)
+
     return result
 
 
@@ -518,7 +573,7 @@ def main() -> None:
     if not cwd.is_dir():
         parser.error(f"--cwd path does not exist or is not a directory: {cwd}")
     result = scan(args.nouns, cwd)
-    print(json.dumps(asdict(result), indent=2))
+    print(json.dumps(asdict(result), separators=(",", ":")))
 
 
 if __name__ == "__main__":

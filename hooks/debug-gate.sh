@@ -24,10 +24,12 @@ case "$tool" in
       squads:parallel-debugging | parallel-debugging)
         touch "$flag"
         ;;
-      squads:tdd | tdd | squads:request-plan | request-plan | squads:receive-plan | receive-plan | \
-        squads:dispatch-agents | dispatch-agents | squads:receive-code-review | receive-code-review | \
-        squads:request-code-review | request-code-review)
-        # Routing to the debugging hand-off skills closes the gate.
+      squads:tdd | tdd | squads:request-plan | request-plan | \
+        squads:receive-code-review | receive-code-review)
+        # Routing to a debugging hand-off (tdd, request-plan) or a legit
+        # route-out (receive-code-review: review feedback, not a bug) closes
+        # the gate. dispatch-agents / receive-plan / request-code-review are
+        # NOT hand-offs — letting them lift the gate bypasses reproduce-first.
         rm -f "$flag"
         ;;
     esac

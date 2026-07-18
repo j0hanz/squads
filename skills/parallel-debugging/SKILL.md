@@ -29,6 +29,8 @@ Single-thread justified only when stack trace's top frame IS root-cause line (wh
 
 ## Invariants — apply to every dispatch
 
+The shared invariants' canonical copy lives in [dispatch-agents](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch); this list restates them for standalone invocation plus debugging-specific additions. If wording ever differs on a shared invariant, dispatch-agents wins — fix the drift there first.
+
 - **Clean context per investigator.** Each agent gets repro, verbatim failing output, its hypothesis — nothing else. Never leak main thread's accumulated guesses; fresh context is whole point.
 - **Judge ≠ generator.** Context that formed hypothesis never grades it — applies to single-thread path too; self-verification isn't verification. Verifiers (Step 3) must not have seen investigator's reasoning — self-preference bias makes it rigged review.
 - **Criteria before dispatch.** Write what confirmed root cause must show (reproduces symptom, all failing paths route through it, classification named) _before_ fanning out. Checks written after only confirm guesses.

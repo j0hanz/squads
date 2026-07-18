@@ -1,3 +1,12 @@
+---
+description: >-
+  JS/TS-specific TDD patterns: distinguishing environment RED from assertion
+  RED, describe/it nesting, async tests, and a failure-analysis table mapping
+  runner errors to the correct next step.
+metadata:
+  tags: [tdd, javascript, typescript, red-green, testing]
+---
+
 # TDD Patterns for JavaScript and TypeScript
 
 ## Basic RED-GREEN Cycle

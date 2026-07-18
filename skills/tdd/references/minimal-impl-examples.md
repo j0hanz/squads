@@ -1,3 +1,12 @@
+---
+description: >-
+  Worked examples of the smallest GREEN implementation per domain (math,
+  validation, parsing, classes) — how minimal is minimal in Step 2 of the
+  TDD cycle. Examples are Python; the shape applies to any language.
+metadata:
+  tags: [tdd, green, minimal-implementation, examples]
+---
+
 # Minimal Implementation: Domain-Specific Patterns
 
 The principle: implement exactly what the test requires, nothing more. Examples are Python; translate the shape to your stack.

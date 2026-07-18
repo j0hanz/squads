@@ -1,7 +1,7 @@
 ---
 name: tdd
 description: Use when new logic requires implementation, or when a TDD red flag appears — a trivially passing test, code written before its test, or GREEN with no observed RED. Not for multi-task work without an approved plan — use request-plan first.
-argument-hint: "[feature or behavior to implement]"
+argument-hint: '[feature or behavior to implement]'
 ---
 
 # tdd

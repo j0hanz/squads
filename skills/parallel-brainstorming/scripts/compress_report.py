@@ -21,10 +21,14 @@ from typing import Any
 _MAX_FILES = 5  # 5: matches the related_files cap in scan_context.py
 _MAX_LOG_LINES = 3  # 3: recent commit signals decay fast; more lines add noise
 _MAX_CONSTRAINTS = 5  # 5: enough to surface limits without flooding the brief
-_MAX_INTERFACE_SHAPES = 10  # 10: shapes are cheap tokens and often decisive for design
+_MAX_INTERFACE_SHAPES = (
+    10  # 10: shapes are cheap tokens and often decisive for design
+)
 _MAX_UNKNOWNS = 4  # 4: one per batch; clarifications are capped at 4 per batch
 _MAX_DESIGN_DOCS = 3  # 3: docs rarely add signal beyond the top 3
-_MAX_ANALOGOUS = 2  # 2: analogous features seed the Minimalist lane; 2 keep it focused
+_MAX_ANALOGOUS = (
+    2  # 2: analogous features seed the Minimalist lane; 2 keep it focused
+)
 
 
 def _dedupe_stable(items: list[Any]) -> list[str]:
@@ -61,7 +65,9 @@ def compress(report: dict[str, Any]) -> dict[str, Any]:
     Deduplicates and truncates each field to module-level limits.
     """
     if not isinstance(report, dict):
-        raise TypeError(f"expected a JSON object (dict), got {type(report).__name__}")
+        raise TypeError(
+            f"expected a JSON object (dict), got {type(report).__name__}"
+        )
     out: dict[str, Any] = {}
 
     # Always keep — zero token cost to preserve
@@ -89,21 +95,23 @@ def compress(report: dict[str, Any]) -> dict[str, Any]:
         )
 
     # Deduplicate and cap list fields
-    out["interface_shapes"] = _dedupe_stable(report.get("interface_shapes", []))[
-        :_MAX_INTERFACE_SHAPES
-    ]
+    out["interface_shapes"] = _dedupe_stable(
+        report.get("interface_shapes", [])
+    )[:_MAX_INTERFACE_SHAPES]
     out["constraints"] = _dedupe_stable(report.get("constraints", []))[
         :_MAX_CONSTRAINTS
     ]
     out["design_docs"] = _dedupe_stable(report.get("design_docs", []))[
         :_MAX_DESIGN_DOCS
     ]
-    out["unknowns"] = _dedupe_stable(report.get("unknowns", []))[:_MAX_UNKNOWNS]
+    out["unknowns"] = _dedupe_stable(report.get("unknowns", []))[
+        :_MAX_UNKNOWNS
+    ]
 
     # Analogous features — key for the Creative Checkpoint and the Minimalist lane
-    out["analogous_features"] = _dedupe_stable(report.get("analogous_features", []))[
-        :_MAX_ANALOGOUS
-    ]
+    out["analogous_features"] = _dedupe_stable(
+        report.get("analogous_features", [])
+    )[:_MAX_ANALOGOUS]
 
     return out
 
@@ -113,7 +121,9 @@ def main() -> None:
         description="Compress a Codebase Context Report for Phase 3 ideation"
     )
     parser.add_argument(
-        "report", nargs="?", help="Path to report JSON (omit to read from stdin)"
+        "report",
+        nargs="?",
+        help="Path to report JSON (omit to read from stdin)",
     )
     args = parser.parse_args()
 

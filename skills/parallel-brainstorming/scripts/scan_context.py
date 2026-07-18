@@ -61,7 +61,16 @@ _DOC_GLOBS = [
     "decisions/*.md",
     "docs/design/*.md",
 ]
-_CONSTRAINT_PATTERNS = ["TODO", "FIXME", "HACK", "rate_limit", "rate limit", "ratelimit", "timeout", "max_size"]
+_CONSTRAINT_PATTERNS = [
+    "TODO",
+    "FIXME",
+    "HACK",
+    "rate_limit",
+    "rate limit",
+    "ratelimit",
+    "timeout",
+    "max_size",
+]
 
 # Adjacent synonyms for common domain verbs/nouns used in analogous feature detection
 _SYNONYM_MAP: dict[str, list[str]] = {
@@ -131,7 +140,7 @@ def _git_log(path: str, cwd: Path) -> str:
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return "no history"
     if result.returncode != 0:
         return "no history"
@@ -273,8 +282,10 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
 
     if suffix == ".py":
         try:
-            tree = ast.parse(file_path.read_text(encoding="utf-8", errors="ignore"))
-        except (SyntaxError, OSError):
+            tree = ast.parse(
+                file_path.read_text(encoding="utf-8", errors="ignore")
+            )
+        except SyntaxError, OSError:
             return []
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef):
@@ -298,7 +309,9 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
     return terms[:5]
 
 
-def _estimate_scope(file_count: int, crosses_boundary: bool) -> tuple[str, str]:
+def _estimate_scope(
+    file_count: int, crosses_boundary: bool
+) -> tuple[str, str]:
     if file_count <= 2 and not crosses_boundary:
         return "S", f"{file_count} file(s), isolated change"
     if file_count <= 5:
@@ -309,7 +322,10 @@ def _estimate_scope(file_count: int, crosses_boundary: bool) -> tuple[str, str]:
         label = "XL"
     if crosses_boundary:
         label = {"S": "M", "M": "L", "L": "XL"}.get(label, label)
-    return label, f"{file_count} file(s) matched; boundary crossing: {crosses_boundary}"
+    return (
+        label,
+        f"{file_count} file(s) matched; boundary crossing: {crosses_boundary}",
+    )
 
 
 def scan(nouns: list[str], cwd: Path) -> ScanResult:
@@ -335,9 +351,12 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     with ThreadPoolExecutor(max_workers=8) as pool:
         # Submit in noun order; iterate results in the same order (not
         # completion order) so related_files is deterministic across runs.
-        grep_futures = [(noun, pool.submit(_grep_files, noun, cwd)) for noun in nouns]
+        grep_futures = [
+            (noun, pool.submit(_grep_files, noun, cwd)) for noun in nouns
+        ]
         adjacent_futures = [
-            (noun, pool.submit(_grep_files, noun, cwd)) for noun in adjacent_nouns
+            (noun, pool.submit(_grep_files, noun, cwd))
+            for noun in adjacent_nouns
         ]
         doc_future = pool.submit(_find_doc_files, cwd)
 
@@ -357,12 +376,17 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
                 search_failed.append(noun)
                 continue
             for path_str in paths:
-                if path_str not in seen_paths and path_str not in adjacent_paths:
+                if (
+                    path_str not in seen_paths
+                    and path_str not in adjacent_paths
+                ):
                     adjacent_paths.add(path_str)
 
         result.design_docs = doc_future.result()
         if not result.design_docs:
-            result.unknowns.append("No glossary, ADR, or architecture docs found")
+            result.unknowns.append(
+                "No glossary, ADR, or architecture docs found"
+            )
 
     if search_failed:
         result.unknowns.append(
@@ -399,7 +423,9 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             for f in result.related_files
         }
         shape_futures = {
-            pool.submit(_extract_interface_shapes, cwd / f.path, noun_set): f.path
+            pool.submit(
+                _extract_interface_shapes, cwd / f.path, noun_set
+            ): f.path
             for f in result.related_files
         }
         test_futures = {
@@ -450,10 +476,13 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     if not result.interface_shapes:
         result.unknowns.append("No typed definitions found for domain nouns")
     if not any(
-        f.last_commit and f.last_commit != "no history" for f in result.related_files
+        f.last_commit and f.last_commit != "no history"
+        for f in result.related_files
     ):
         result.unknowns.append("No git history found for matched files")
-    if result.related_files and not any(f.has_tests for f in result.related_files):
+    if result.related_files and not any(
+        f.has_tests for f in result.related_files
+    ):
         result.unknowns.append(
             "No test files found for matched files — test coverage unknown"
         )

@@ -1,7 +1,7 @@
 ---
 name: request-plan
 description: Use when a new feature or change requires a plan or specification. Not when the solution space is open or two or more distinct architectural approaches are in play — use parallel-brainstorming first.
-argument-hint: "[--depth sketch|contract|blueprint] <feature description>"
+argument-hint: '[--depth sketch|contract|blueprint] <feature description>'
 ---
 
 # request-plan

@@ -1,7 +1,7 @@
 ---
 name: receive-plan
 description: Use when a plan/specs pair exists and needs validation before execution. Not for sketch-depth plans.
-argument-hint: "[--depth contract|blueprint] <plan-path> <specs-path>"
+argument-hint: '[--depth contract|blueprint] <plan-path> <specs-path>'
 ---
 
 # receive-plan

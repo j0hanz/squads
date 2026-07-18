@@ -1,7 +1,7 @@
 ---
 name: parallel-brainstorming
 description: Use when requirements are vague or the solution space is open before a plan exists. Prefer over request-plan when two or more distinct architectural approaches are in play.
-argument-hint: "[feature request or problem to explore]"
+argument-hint: '[feature request or problem to explore]'
 ---
 
 # parallel-brainstorming

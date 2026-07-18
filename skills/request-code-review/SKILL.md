@@ -1,7 +1,7 @@
 ---
 name: request-code-review
 description: Use when a verified diff needs a fresh-eye review before merging. Prefer over receive-code-review when requesting a new review rather than acting on feedback.
-argument-hint: "[target: branch, commit, or path — omit to review the uncommitted working tree]"
+argument-hint: '[target: branch, commit, or path — omit to review the uncommitted working tree]'
 ---
 
 # request-code-review

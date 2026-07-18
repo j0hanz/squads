@@ -43,7 +43,7 @@ test('fetches user by id', async () => {
 // WRONG — the promise is never awaited; the test returns synchronously with zero
 // assertions run, so the framework reports a pass
 test('fetches user', () => {
-  fetchUser('u-123').then(user => expect(user.name).toBe('Alice'));
+  fetchUser('u-123').then((user) => expect(user.name).toBe('Alice'));
 });
 ```
 

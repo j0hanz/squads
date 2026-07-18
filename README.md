@@ -10,7 +10,7 @@ Eight skills, each with a single job, that hand off along one lifecycle:
 
 - **parallel-brainstorming**: explore a vague or open problem before any plan exists.
 - **request-plan** / **receive-plan**: draft a plan or spec, then validate it before execution.
-- **dispatch-agents**: execute an approved plan across multiple agents.
+- **dispatch-agents**: triages every incoming request first, selects the multi-agent workflow, and executes approved plans across agent fleets.
 - **tdd**: implement new logic test-first; flags tests written after the code.
 - **parallel-debugging**: reproduce and isolate an unexpected failure before fixing it.
 - **request-code-review** / **receive-code-review**: get a fresh-eye review on a diff, then resolve the feedback.
@@ -28,7 +28,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 
 ## Usage
 
-On every session start, clear, and compact, the `using-squads` router is injected automatically and picks the right skill by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
+On every session start, clear, and compact, the `using-squads` router is injected automatically and routes each task through `dispatch-agents`, whose triage step selects the right workflow by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
 
 ```text
 /squads:parallel-brainstorming  "add offline mode to the editor"
@@ -36,16 +36,18 @@ On every session start, clear, and compact, the `using-squads` router is injecte
 /squads:tdd                     "parse a duration string into seconds"
 ```
 
-When unsure which skill fits, start upstream (brainstorm or plan) before executing or reviewing.
+When unsure which skill fits, invoke `dispatch-agents` — its triage picks for you, preferring upstream (brainstorm or plan) over executing or reviewing.
 
 ### Lifecycle
 
 ```text
-parallel-brainstorming → request-plan → receive-plan → dispatch-agents / tdd
-                                                       ↓
-                                  parallel-debugging ← (Validate or runtime failure)
-                                                       ↓
-                              request-code-review → receive-code-review → commit / PR
+user request → dispatch-agents (triage: pick workflow + fleet)
+  ├─ open problem  → parallel-brainstorming → request-plan → receive-plan ─┐
+  ├─ clear feature → request-plan → receive-plan ─┬──────────────────────┘
+  │                                               └→ dispatch-agents (multi-task) / tdd (single task)
+  ├─ failure       → parallel-debugging → tdd (logic bug) / request-plan (design-level)
+  ├─ bulk / audit  → dispatch-agents patterns (fan out, adversarial verify, loop until done)
+  └─ verified diff → request-code-review → receive-code-review → commit / PR
 ```
 
 ## Development

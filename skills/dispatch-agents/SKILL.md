@@ -1,20 +1,27 @@
 ---
 name: dispatch-agents
-description: Use when a task exceeds one context window — many independent items or unbiased checks — or an APPROVED docs/plan/*.plan.md needs execution. Not for design ideation — use parallel-brainstorming.
+description: Use when a new task or user request arrives — invoked first to triage it and select the multi-agent workflow (brainstorm, plan, execute, debug, review) and fleet shape. Also executes an APPROVED docs/plan/*.plan.md. Not for design ideation itself — use parallel-brainstorming.
 argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 ---
 
 # dispatch-agents
 
-## First: do you need agents at all?
+## Step 0: Triage — invoked first, before any other skill
 
-Single agent with good tools handles most tasks. Dispatch only when one holds:
+Every incoming task or user request starts here. Classify it (first match wins), route it to its workflow, and decide the fleet shape — never start building, planning, or fixing before triage.
 
-- Work exceeds one context window (whole-repo audit, thousands of items).
-- Items independent and numerous — per-file, per-folder, per-claim work.
-- Need unbiased judge of work this context produced.
+| Incoming request                                                                     | Workflow                                                                            | Fleet decision                                                     |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Vague requirements, open solution space, ≥2 distinct architectural approaches        | [parallel-brainstorming](../parallel-brainstorming/SKILL.md)                        | None — its ideation phases forbid subagents                        |
+| Clear feature or change needing a plan or spec                                       | [request-plan](../request-plan/SKILL.md) → [receive-plan](../receive-plan/SKILL.md) | Ideators by depth (sketch 0 / contract 2 / blueprint 3) + 1 critic |
+| APPROVED `docs/plan/*.plan.md` in hand                                               | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph           |
+| Single new logic behavior, no plan needed, or a TDD red flag                         | [tdd](../tdd/SKILL.md)                                                              | One worker; review supplies the fresh eyes                         |
+| Test, `Validate:` command, or runtime failing unexpectedly — before any fix          | [parallel-debugging](../parallel-debugging/SKILL.md)                                | One investigator per hypothesis + fresh skeptics                   |
+| Verified diff awaiting review                                                        | [request-code-review](../request-code-review/SKILL.md)                              | 1 fresh read-only reviewer                                         |
+| Review feedback (human, bot, or subagent) to resolve                                 | [receive-code-review](../receive-code-review/SKILL.md)                              | Main thread verifies findings; re-review capped at 2               |
+| Bulk independent items, whole-repo audit, or unbiased judging of this context's work | Patterns (below)                                                                    | Fan out — one agent per chunk, cap ~10                             |
 
-One-shot edits and simple questions never need fleet. When in doubt, stay single-agent, escalate only when it breaks.
+If two rows fit, the earlier wins: ideation precedes planning, planning precedes execution, a bug precedes its fix. One-shot edits and simple questions need no workflow or fleet — answer directly and stop. When in doubt on fleet size, go smaller; every fan-out multiplies token cost.
 
 ## Invariants — apply to every dispatch
 

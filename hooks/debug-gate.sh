@@ -44,7 +44,15 @@ case "$tool" in
     file_path=$(jq -r '.tool_input.file_path // empty' <<<"$input")
     base=$(basename "${file_path//\\//}")
     case "$base" in
-      *.md | *test* | *spec* | conftest.py) exit 0 ;;
+      # Exempt markdown + genuine test/spec files only. Anchor "test"/"spec"
+      # as a delimited token (start, end, or beside _ . -) so production files
+      # like latest.js / inspect.js / special.py / contest.go are NOT exempted.
+      *.md) exit 0 ;;
+      test_* | *_test | *_test.* | *.test.* | *.test | \
+      *_spec | *_spec.* | *.spec.* | *.spec | \
+      *Test | *Test.* | *Spec | *Spec.* | \
+      conftest.py | *.stories.* | *.cy.*)
+        exit 0 ;;
     esac
 
     echo "squads debug-gate: parallel-debugging is active — its HARD GATE forbids code edits before the root cause is reproduced, adversarially verified, and routed to tdd (logic bug) or request-plan (design-level). Invoke the routing skill first; if debugging was abandoned, remove $flag." >&2

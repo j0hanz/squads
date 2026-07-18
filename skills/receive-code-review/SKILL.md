@@ -44,11 +44,11 @@ argument-hint: '[review feedback to resolve]'
 
 1. Re-run the tests covering the fixes and confirm they pass. If no tests cover the fix, say so and validate by reproducing the affected behavior manually.
 2. Route by outcome:
-   - **Resolved** — commit the changes, then push / open a PR. If a fresh review is wanted, hand off to [request-code-review](../request-code-review/SKILL.md) (re-review pass N).
+   - **Resolved** — commit the changes, then prompt the user before pushing or opening a PR (same convention as request-code-review's PASS prompt); with no user to ask (autonomous invocation), stop after the commit and report. If a fresh review is wanted, hand off to [request-code-review](../request-code-review/SKILL.md) (re-review pass N).
    - **Post-fix test run FAILS** — the fix is wrong or the root cause was misunderstood; hand off to [parallel-debugging](../parallel-debugging/SKILL.md) to reproduce and re-isolate before re-fixing. Do not iterate blindly in Step 3.
    - **Re-review came back FAIL again** — if this is the 3rd pass, mark **BLOCKED**, escalate to the user, and stop; otherwise loop back to Step 1 with the new feedback.
 
-**Done when:** changes are committed and a PR is opened or a re-review is requested, or the user is escalated to, or a failing post-fix test run is handed off to parallel-debugging.
+**Done when:** changes are committed and push/PR is confirmed with the user (or reported as awaiting confirmation) or a re-review is requested, or the user is escalated to, or a failing post-fix test run is handed off to parallel-debugging.
 
 ## Next Skills
 

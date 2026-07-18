@@ -32,26 +32,26 @@ Report `N_passed / N_total` per category. Any `N_passed < N_total` → REVISE wi
 
 **Done when:** counts calculated, plan either advances to Step 3 or gets itemized REVISE.
 
-## Step 3: One Critic Agent
+## Step 3: Critic Fan-out (blueprint) or Single Critic (contract)
 
-Dispatch **1 critic subagent** (write/edit tools denied), covering all lenses in single pass. Default full deep check (depth=blueprint); if depth `contract`, run lighter check focused on scope boundaries and dependency cycles.
+Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer drafting context — judge ≠ generator; plan + specs are the artifact judged, passed clean.
 
-- **Spec-Correctness** — spec complete, consistent.
-- **Dependency Order** — task sequencing logical, acyclic.
-- **Scope-Risk** — oversized, underspecified, or high-risk tasks.
+- **`contract`** — 1 critic, all three lenses in single pass, lighter check focused on scope boundaries and dependency cycles. Lens rubrics below still apply; one agent holds all three.
+- **`blueprint`** — 3 critics dispatched in ONE message, one per lens, blind to each other (hub-and-spoke):
+  - **Spec-Correctness** — High: a REQ contradicts another REQ or is met by no task; Med: REQ ambiguously worded or only partially covered; Low: naming/format nit.
+  - **Dependency Order** — High: cycle in `Depends on:` graph, or task scheduled before its dependency; Med: parallelizable tasks over-serialized, or missing transitive `Depends on:` link; Low: suboptimal but valid order.
+  - **Scope-Risk** — High: task touches >3 files or crosses a contract boundary with no `Depends on:`; Med: oversized single task or underspecified `Validate:`; Low: minor risk, localizable.
 
-Rate each finding **High / Med / Low**. Return itemized list with `file:line` / `REQ-id` / `TASK-id` specificity — never bare summary.
+Each critic returns itemized findings with `file:line` / `REQ-id` / `TASK-id` specificity and severity per its lens rubric — never bare summary. If a critic returns bare summary or malformed output, re-dispatch once with reminder of required itemized format; second malformed return → escalate to user (interactive) or return failure to requesting skill (autonomous).
 
-If critic returns bare summary or malformed output, re-dispatch once with reminder of required itemized format; second malformed return → escalate to user (interactive) or return failure to requesting skill (autonomous).
-
-**Done when:** critic returns classified findings with specific line/task IDs.
+**Done when:** every critic (1 for contract, 3 for blueprint) returns classified findings with specific line/task IDs.
 
 ## Step 4: Main Thread Verdict
 
-Read critic's findings directly — no Arbiter agent:
+Read all critics' findings directly — no Arbiter agent. Dedupe findings by exact `(lens, REQ-id|TASK-id, file:line)` tuple across critics; per-lens critics produce disjoint findings by construction (dedup is a no-op for contract's 1 critic and a safety net for blueprint's 3). Apply the threshold to the deduped set:
 
 - Any **High** finding → REVISE.
-- **≥2 Med** findings → REVISE.
+- **≥2 Med** findings across all critics' deduped findings → REVISE. Med findings from different lenses corroborate — count them separately, do not collapse to one.
 - Exactly **1 Med** (no High) → APPROVED (note the Med and any Low findings as comment in plan header).
 - **Low** only or nothing → APPROVED (note Low findings as comment in plan header).
 

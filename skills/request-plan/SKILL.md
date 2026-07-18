@@ -117,6 +117,7 @@ Detail: [Specific requirement statement]
 
 ## Next Skills
 
-| Skill                                    | Use Case                                                          |
-| :--------------------------------------- | :---------------------------------------------------------------- |
-| [receive-plan](../receive-plan/SKILL.md) | Verify plan/specs pair before execution (contract/blueprint only) |
+| Skill                                    | Use Case                                                                                             |
+| :--------------------------------------- | :--------------------------------------------------------------------------------------------------- |
+| [receive-plan](../receive-plan/SKILL.md) | Verify plan/specs pair before execution (contract/blueprint only)                                    |
+| [tdd](../tdd/SKILL.md)                   | Sketch-depth plan implemented directly via TDD (single logic behavior); skips receive-plan by design |

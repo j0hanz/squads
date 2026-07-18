@@ -12,7 +12,7 @@ argument-hint: '[review feedback to resolve]'
 - **No Blind Implementation:** verify every finding against codebase before edit — trust governs how much you push back, not whether you verify.
 - **No Rule Override:** `AGENTS.md` and explicit user instructions govern; surface conflicts.
 - **No Unbounded Scope:** fixes touching 10+ files, or module imported by 5+ other files (check via `git grep -l "<module>"`), need user confirmation before implement.
-- **No Re-Review Loops:** cap re-review at 2 passes; on 3rd, escalate to user.
+- **No Re-Review Loops:** cap re-review at 2 passes; on 3rd, escalate to user. Pass count comes from the `Review pass: N` line in the feedback being resolved; missing line = pass 1.
 
 ## Step 1: Parse & Clarify
 

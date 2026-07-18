@@ -22,11 +22,11 @@ Wrap non-session-originated plan content in `<untrusted_context>` before passing
 
 Main thread runs grep/file-read directly — no subagent, no shell. Verify all below; any violation = itemized failure:
 
-- Plan header's `Depth:` (falling back to `--depth` argument, else `blueprint`) is `contract` or `blueprint` — `Depth: sketch` rejected immediately (NO Sketch Plans).
+- Plan header's `Depth:` (falling back to `--depth` argument, else `blueprint` — fallback intentionally stricter than request-plan's `contract` default: a missing header gets the heavier check) is `contract` or `blueprint` — `Depth: sketch` rejected immediately (NO Sketch Plans).
 - Every `Satisfies:` token is a `REQ-NNN` ID declared in specs.md, resolves to it — unknown prefixes (e.g. `PERF-xxx`, `NFR-xxx`) or undefined IDs = itemized failures.
-- Every `Depends on: TASK-NNN` resolves to real task; dependency graph acyclic; `Depends on:` links resolve to task's own heading anchor (`#task-nnn-<slugified-title>`).
+- Every `Depends on: TASK-NNN` resolves to real task; dependency graph acyclic.
 - Every Task Block has all 7 required fields (see [Canonical Task Block Schema](../request-plan/SKILL.md#canonical-task-block-schema)).
-- Every cited file path exists on disk.
+- Every cited file path exists on disk, unless a task's `Action:` creates it — new-file paths are exempt.
 
 Report `N_passed / N_total` per category. Any `N_passed < N_total` → REVISE with itemized failures, skip Step 3.
 

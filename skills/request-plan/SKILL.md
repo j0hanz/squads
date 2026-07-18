@@ -89,7 +89,7 @@ Required in all final `specs.md` and `plan.md` outputs; ideator proposals exempt
 ```markdown
 ### TASK-NNN: [Action title]
 
-Depends on: [TASK-NNN](#task-nnn-action-title) (comma-separated list: [TASK-001](#task-001-first-task), [TASK-002](#task-002-second-task)) or none — anchors are the slugified task heading (`#task-nnn-<slugified-title>`)
+Depends on: TASK-NNN (comma-separated list: TASK-001, TASK-002) or none
 Files: [path/to/file.ts](path/to/file.ts) (or comma-separated list of workspace-relative paths)
 Symbols: [symbolName](path/to/file.ts#L42) (or comma-separated list of workspace-relative symbol paths)
 Satisfies: REQ-001, REQ-002 (comma-separated list of REQ-NNN IDs declared in specs.md)

@@ -1,6 +1,6 @@
 # Model-tier per role
 
-Canonical role→model tier mapping for dispatched subagents. One swap-point when model pricing or availability shifts. Guidance, not config: where the Agent tool exposes a `model` param, set it per this table; where it doesn't, encode the tier as a prompt instruction ("think carefully, verify before answering" for strong/strongest; "quick best-effort, one pass" for cheap).
+Canonical role→model tier mapping for dispatched subagents. One swap-point when model pricing or availability shifts. Guidance, not config: where the Agent tool exposes a `model` param, set it per this table — cheap → `haiku`, strong → `sonnet`, strongest → `opus`, tier unknown → omit the param (inherit); where it doesn't, encode the tier as a prompt instruction ("think carefully, verify before answering" for strong/strongest; "quick best-effort, one pass" for cheap).
 
 | Role                                   | Tier      | Why                                                                 |
 | -------------------------------------- | --------- | ------------------------------------------------------------------- |

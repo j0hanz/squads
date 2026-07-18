@@ -62,9 +62,9 @@ Check correctness, security, edge cases, and reuse/simplification, then reply st
 
 ### Step 3: Hand off
 
-1. Paste subagent's output verbatim to user.
+1. State `Review pass: N` (N = incoming re-review pass number, else 1), then paste subagent's output verbatim to user.
 2. On **PASS**: prompt "Changes are ready — commit and push / open a PR."
-3. On **FAIL**: invoke `receive-code-review`, pass along re-review pass number if given (its 2-pass cap depends on it). Don't fix findings directly.
+3. On **FAIL**: invoke `receive-code-review` with the same `Review pass: N` line (its 2-pass cap depends on it). Don't fix findings directly.
 4. **Done when:** verbatim review surfaced, PASS or FAIL route taken.
 
 ## Next Skills

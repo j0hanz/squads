@@ -12,7 +12,7 @@ if [[ ! -f "$skill_path" ]]; then
   exit 0
 fi
 
-# Drop YAML frontmatter: a leading --- line through the next --- line.
+# Drop YAML frontmatter: a leading --- line through the next --- line.Do 1
 cleaned=$(awk '
   NR == 1 && /^---\r?$/ { in_fm = 1; next }
   in_fm { if (/^---\r?$/) in_fm = 0; next }

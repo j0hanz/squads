@@ -3,7 +3,6 @@ name: using-squads
 description: Router preamble injected by the session-start hook — routes every incoming task to dispatch-agents for triage and workflow selection. Never invoked directly.
 user-invocable: false
 disable-model-invocation: true
-argument-hint: '[task or situation to route]'
 ---
 
 # using-squads

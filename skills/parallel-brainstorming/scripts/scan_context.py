@@ -288,11 +288,12 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
         except SyntaxError, OSError:
             return []
         for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef):
-                if any(noun in node.name.lower() for noun in nouns):
-                    doc = ast.get_docstring(node)
-                    entry = node.name + (f" — {doc[:80]}" if doc else "")
-                    terms.append(entry)
+            if isinstance(node, ast.ClassDef) and any(
+                noun in node.name.lower() for noun in nouns
+            ):
+                doc = ast.get_docstring(node)
+                entry = node.name + (f" — {doc[:80]}" if doc else "")
+                terms.append(entry)
         return terms[:5]
 
     pattern = _LANG_TYPE_PATTERNS.get(suffix)

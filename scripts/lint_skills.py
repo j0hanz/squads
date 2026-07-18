@@ -28,7 +28,7 @@ def check_frontmatter(file_path, dir_name):
     try:
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
-    except:
+    except OSError:
         failures.append((file_path, "cannot read file"))
         return failures
 
@@ -109,7 +109,7 @@ def get_markdown_headings(file_path):
             heading_text = match.group(1).strip()
             slug = slug_heading(heading_text)
             headings[slug] = heading_text
-    except:
+    except OSError:
         pass
 
     return headings
@@ -123,7 +123,7 @@ def check_relative_links(file_path):
     try:
         with open(file_path, encoding="utf-8") as f:
             content = f.read()
-    except:
+    except OSError:
         return [(file_path, "cannot read file")], 0
 
     # Find all links like ](../<dir>/SKILL.md or ](../<dir>/SKILL.md#<anchor>)
@@ -173,7 +173,7 @@ def check_contracts():
         try:
             with open(full_path, encoding="utf-8") as f:
                 content = f.read()
-        except:
+        except OSError:
             failures.append((file_path, "cannot read file"))
             continue
 

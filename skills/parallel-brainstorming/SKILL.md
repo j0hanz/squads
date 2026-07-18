@@ -23,7 +23,7 @@ When in doubt whether the request is a bug fix or a feature, treat it as design 
 
 - **No Silent Skips:** If task needs zero discovery, name exact step skipped (Probe, Scan, or Understanding Lock) and explain why — never skip silently.
 - **Probe:** Identify target users; ask clarifying questions if request ambiguous.
-- **Scan:** Run `python ${CLAUDE_SKILL_DIR}/scripts/scan_context.py <noun1> <noun2> ... --cwd '<root>' | python ${CLAUDE_SKILL_DIR}/scripts/compress_report.py` (fallback to `Grep` if it fails).
+- **Scan:** Run `scan_context.py` piped through `compress_report.py` with whichever Python interpreter is available — try `python3`, then `py`, then `python`: `<interp> ${CLAUDE_SKILL_DIR}/scripts/scan_context.py <noun1> <noun2> ... --cwd '<root>' | <interp> ${CLAUDE_SKILL_DIR}/scripts/compress_report.py` (fallback to `Grep` if it fails).
 - **Report:** Extract Related Files (with recent commits and test coverage), Interface Shapes, Design Docs, Analogous Features, Constraints, Scope (S/M/L/XL) with reasoning, and Unknowns.
 - **Zero-Code Check:** Stop and offer exit if existing code/config already solves this.
 - **Understanding Lock:** Summarize problem and understanding. Ask user (via `AskUserQuestion`) only if an Unknowns item blocks approach generation or Scope is L/XL; otherwise proceed to Creative Checkpoint.

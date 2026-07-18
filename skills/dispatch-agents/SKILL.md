@@ -10,16 +10,16 @@ argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 
 Every incoming task/request start here. Classify it (first match win), route to workflow, decide fleet shape — never start building, planning, fixing before triage.
 
-| Incoming request                                                                     | Workflow                                                                            | Fleet decision                                                     |
-| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Vague requirements, open solution space, ≥2 distinct architectural approaches        | [parallel-brainstorming](../parallel-brainstorming/SKILL.md)                        | None — ideation phases forbid subagents                            |
-| Clear feature or change needing a plan or spec                                       | [request-plan](../request-plan/SKILL.md) → [receive-plan](../receive-plan/SKILL.md) | Ideators by depth (sketch 0 / contract 2 / blueprint 3) + 1 critic |
-| APPROVED `docs/plan/*.plan.md` in hand                                               | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph           |
-| Single new logic behavior, no plan needed, or TDD red flag                           | [tdd](../tdd/SKILL.md)                                                              | One worker; review supply fresh eyes                               |
-| Test, `Validate:` command, or runtime fail unexpectedly — before any fix             | [parallel-debugging](../parallel-debugging/SKILL.md)                                | One investigator per hypothesis + fresh skeptics                   |
-| Verified diff awaiting review                                                        | [request-code-review](../request-code-review/SKILL.md)                              | 1 fresh read-only reviewer                                         |
-| Review feedback (human, bot, or subagent) to resolve                                 | [receive-code-review](../receive-code-review/SKILL.md)                              | Main thread verify findings; re-review capped at 2                 |
-| Bulk independent items, whole-repo audit, or unbiased judging of this context's work | Patterns (below)                                                                    | Fan out — one agent per chunk, cap ~10                             |
+| Incoming request                                                                     | Workflow                                                                            | Fleet decision                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vague requirements, open solution space, ≥2 distinct architectural approaches        | [parallel-brainstorming](../parallel-brainstorming/SKILL.md)                        | None — ideation phases forbid subagents                                                                                                                                                                                                                            |
+| Clear feature or change needing a plan or spec                                       | [request-plan](../request-plan/SKILL.md) → [receive-plan](../receive-plan/SKILL.md) | Ideators by depth (sketch 0 / contract 2 / blueprint 3) + 1 critic (contract) / 3 per-lens critics (blueprint) — sketch skips receive-plan, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per request-plan Step 5 |
+| APPROVED `docs/plan/*.plan.md` in hand                                               | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                                           |
+| Single new logic behavior, no plan needed, or TDD red flag                           | [tdd](../tdd/SKILL.md)                                                              | One worker; review supply fresh eyes                                                                                                                                                                                                                               |
+| Test, `Validate:` command, or runtime fail unexpectedly — before any fix             | [parallel-debugging](../parallel-debugging/SKILL.md)                                | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                                   |
+| Verified diff awaiting review                                                        | [request-code-review](../request-code-review/SKILL.md)                              | 1 fresh read-only reviewer                                                                                                                                                                                                                                         |
+| Review feedback (human, bot, or subagent) to resolve                                 | [receive-code-review](../receive-code-review/SKILL.md)                              | Main thread verify findings; re-review capped at 2                                                                                                                                                                                                                 |
+| Bulk independent items, whole-repo audit, or unbiased judging of this context's work | Patterns (below)                                                                    | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                             |
 
 Two rows fit? Earlier wins: ideation before planning, planning before execution, bug before its fix. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiply token cost.
 
@@ -50,9 +50,9 @@ Pick first fit; compose when task demands it.
 
 Exploring _design approaches_ isn't Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there, ideation phases forbid subagents.
 
-Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) between rounds, or it never converges.
+Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) by `(file:line, classification)` between rounds, or it never converges.
 
-Match model to role: cheap/fast models for classification, mechanical stages; strongest models for judging, verification. One tier rarely fits all seats.
+Match model to role per [model-tier reference](references/model-tier.md) — cheap/fast for classification and mechanical stages, strongest for judging and verification. One tier rarely fits all seats.
 
 ## Executing an approved plan
 
@@ -63,14 +63,14 @@ When [receive-plan](../receive-plan/SKILL.md) hands off an APPROVED `docs/plan/<
 - **`Validate:` is structured return.** Each worker runs task's `Validate:` command, reports exit code, output — task without passing validation isn't done. Failed `Validate:` from impl bug (not plan error) routes to `parallel-debugging`, reproduce/isolate root cause before re-fixing; genuinely wrong plan routes to `request-plan`.
 - **`Satisfies:` goes into worker's spec.** Worker gets REQ text it satisfies — knows acceptance criterion, not just action.
 
-**Done when:** every task in plan dispatched in dependency order, returned passing `Validate:` exit code, or failing task routed to `parallel-debugging` (impl bug) / `request-plan` (plan error).
+**Done when:** every task in plan dispatched in dependency order, returned passing `Validate:` exit code, or failing task routed to `parallel-debugging` (impl bug) / `request-plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint, no separate run file.
 
 ## Long-running builds
 
 For multi-milestone implementation work, use three roles:
 
 1. **Orchestrator** plans: features, milestones, validation contract — concrete assertions defining correctness, written before any code exists.
-2. **Workers** implement serially, one at a time, each committing so next inherits clean working state.
+2. **Workers** implement per file overlap (reads-parallel/writes-serial, per the invariants): overlap → serial, one at a time, each committing so next inherits clean state; disjoint → parallel, each in its own `git worktree` (main thread creates worktrees, dispatches in one message, merges branches back serially).
 3. **Validators** — who never saw code — check each milestone twice: static scrutiny (tests, types, lint, review) and behavior (actually exercise running thing end-to-end).
 
 ## Next Skills

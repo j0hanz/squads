@@ -35,7 +35,7 @@ description: Use when code review feedback has been received from a human, bot, 
 ## Step 3: Implement
 
 1. If the fix touches 10+ files, or a module imported by 5+ other files (check via `git grep -l`), get user confirmation first (No Unbounded Scope).
-2. Implement verified fixes one at a time in severity order: blocking/security → correctness → hygiene/typos (from a request-code-review report: all Blocking Issues first, then Advisory Issues split correctness → hygiene).
+2. Implement verified fixes one at a time in severity order: blocking/security → correctness → hygiene/typos. From a request-code-review report: do all Blocking Issues first; the Advisory Issues list is flat, so re-classify each Advisory item as correctness or hygiene yourself and do correctness before hygiene/typos.
 
 **Done when:** all verified fixes are implemented, one finding at a time.
 

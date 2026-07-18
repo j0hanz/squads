@@ -10,7 +10,7 @@ description: Use when code review feedback has been received from a human, bot, 
 - **No Performative Acknowledgment:** skip thanks/agreement framing; state the fix directly.
 - **No Blind Implementation:** verify every finding against the codebase before editing — trust governs how much you push back, not whether you verify.
 - **No Rule Override:** `AGENTS.md` and explicit user instructions govern; surface conflicts.
-- **No Unbounded Scope:** fixes touching 10+ files or core design require user confirmation before implementing.
+- **No Unbounded Scope:** fixes touching 10+ files, or a module imported by 5+ other files (check via `git grep -l "<module>"`), require user confirmation before implementing.
 - **No Re-Review Loops:** cap re-review at 2 passes; on the 3rd, escalate to the user.
 
 ## Step 1: Parse & Clarify
@@ -34,7 +34,7 @@ description: Use when code review feedback has been received from a human, bot, 
 
 ## Step 3: Implement
 
-1. If the fix touches 10+ files or core design, get user confirmation first (No Unbounded Scope).
+1. If the fix touches 10+ files, or a module imported by 5+ other files (check via `git grep -l`), get user confirmation first (No Unbounded Scope).
 2. Implement verified fixes one at a time in severity order: blocking/security → correctness → hygiene/typos (from a request-code-review report: all Blocking Issues first, then Advisory Issues split correctness → hygiene).
 
 **Done when:** all verified fixes are implemented, one finding at a time.

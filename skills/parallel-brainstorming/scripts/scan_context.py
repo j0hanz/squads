@@ -22,7 +22,7 @@ import os
 import re
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -186,6 +186,7 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
                 "!*.lock",
                 "--glob",
                 "!*.sum",
+                "--sort=path",
                 "--",
                 pattern,
                 ".",
@@ -226,7 +227,7 @@ def _find_doc_files(cwd: Path) -> list[str]:
             rel = (rel_root / name).as_posix()
             for i, g in enumerate(_DOC_GLOBS):
                 if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, "*/" + g):
-                    buckets[i].append(str(rel_root / name))
+                    buckets[i].append((rel_root / name).as_posix())
                     break
     found = [p for bucket in buckets for p in bucket]
     return found[:5]  # 5: matches the original cap
@@ -253,9 +254,9 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
     for candidate in candidates:
         if candidate.exists():
             try:
-                return str(candidate.relative_to(cwd))
+                return candidate.relative_to(cwd).as_posix()
             except ValueError:
-                return str(candidate)
+                return candidate.as_posix()
     return ""
 
 
@@ -434,30 +435,32 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             for f in result.related_files
         }
 
-        for fut in as_completed(log_futures):
+        # Collect in submission (dict-insertion) order, not completion order,
+        # so constraints / interface_shapes / unknowns stay deterministic
+        # across runs — the futures still execute concurrently in the pool.
+        for fut, file_signal in log_futures.items():
             try:
-                log_futures[fut].last_commit = fut.result()
+                file_signal.last_commit = fut.result()
             except Exception:
-                log_futures[fut].last_commit = "no history"
+                file_signal.last_commit = "no history"
 
-        for fut in as_completed(constraint_futures):
+        for fut, path in constraint_futures.items():
             try:
                 result.constraints.extend(fut.result())
             except Exception as exc:
                 result.unknowns.append(
-                    f"Error scanning constraints for {constraint_futures[fut]}: {exc}"
+                    f"Error scanning constraints for {path}: {exc}"
                 )
 
-        for fut in as_completed(shape_futures):
+        for fut, path in shape_futures.items():
             try:
                 result.interface_shapes.extend(fut.result())
             except Exception as exc:
                 result.unknowns.append(
-                    f"Error extracting shapes for {shape_futures[fut]}: {exc}"
+                    f"Error extracting shapes for {path}: {exc}"
                 )
 
-        for fut in as_completed(test_futures):
-            file_signal = test_futures[fut]
+        for fut, file_signal in test_futures.items():
             try:
                 test_path = fut.result()
                 file_signal.has_tests = bool(test_path)

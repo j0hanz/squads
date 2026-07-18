@@ -1,6 +1,6 @@
 ---
 name: dispatch-agents
-description: Use when deciding whether to delegate work to subagents, before fanning out parallel agents, or when a task exceeds one context window — many independent items, whole-repo sweeps, or unbiased checks — or when an APPROVED docs/plan/*.plan.md needs execution. Not for design ideation — use parallel-brainstorming.
+description: Use when a task exceeds one context window — many independent items or unbiased checks — or an APPROVED docs/plan/*.plan.md needs execution. Not for design ideation — use parallel-brainstorming.
 ---
 
 # dispatch-agents
@@ -69,6 +69,8 @@ For multi-milestone implementation work, use three roles:
 Nothing depends on agent remembering across handoffs.
 
 ## Strict Rules
+
+These rules are HARD GATEs — inviolable, same rigor as the repro gate in parallel-debugging.
 
 - **No mocked verifiers.** Adversarial verifiers are distinct subagents with isolated context; the main thread never grades work it produced or saw produced — in-thread "verification" is self-review, not verification.
 - **Bare-claim to skeptic.** Hand a verifier the finding as a one-line claim, not the reasoning that produced it — smuggling the generator's reasoning into the claim defeats judge ≠ generator while satisfying every literal rule.

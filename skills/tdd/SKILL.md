@@ -10,10 +10,12 @@ Autonomous TDD execution. **HARD GATE:** No implementation code WITHOUT a failin
 
 ## When NOT to use TDD
 
-Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS or zero-logic boilerplate; then skip TDD and state the category and reason in the structured return. Pick from the three categories below:
+Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS (and only that category); then skip TDD and state the reason in the structured return. Zero-logic boilerplate is not an autonomous escape hatch — if in doubt, write the test. Pick from the three categories below:
 
 1. **Recommended** — Skip TDD: [matching category] because [specific reason].
 2. **Alternative** — Use full TDD anyway + reason the escape hatch doesn't apply.
+
+**Escape-hatch categories:**
 
 - **Exploratory Spikes:** Implementation path unknown; throwaway code to "find the shape." **Mandatory:** once found, the spike MUST be discarded (`git stash drop`/delete, not committed) and re-implemented through RED-GREEN-REFACTOR. A spike is a sketch, never the shipped diff.
 - **Trivial One-Liners:** Pure data mappings or standard boilerplate with zero logic.
@@ -76,7 +78,7 @@ _If JavaScript/TypeScript, read `${CLAUDE_SKILL_DIR}/references/js-ts-patterns.m
 
 ## Step 2: GREEN (Make It Pass)
 
-_If unsure how minimal is minimal, read `${CLAUDE_SKILL_DIR}/references/minimal-impl-examples.md` fully._
+_If unsure how minimal is minimal, read `${CLAUDE_SKILL_DIR}/references/minimal-impl-examples.md` fully (examples are Python; the principle applies to any language)._
 
 1. Checkpoint the working tree before editing.
 2. Write the smallest implementation that satisfies the test — no speculative generality.
@@ -88,7 +90,7 @@ _If unsure how minimal is minimal, read `${CLAUDE_SKILL_DIR}/references/minimal-
 
 Before trusting a passing test:
 
-1. Revert the implementation.
+1. Revert the implementation to the Step 1 stub (or remove the body, leaving only the signature).
 2. Run the test — confirm RED.
 3. Restore the implementation.
 4. Run the test — confirm GREEN.
@@ -101,7 +103,7 @@ Before trusting a passing test:
 - Improve structure (naming, deduplication) without changing behavior.
 - Never interleave a behavior fix with a refactor — separate passes.
 - Re-run tests after every refactor; must stay GREEN.
-- **Done when:** no further structural improvement available AND the relevant tests GREEN; then evaluate coverage against the behavior list (gaps → back to RED; else hand off).
+- **Done when:** one full pass over the diff yields no rename, deduplication, or extraction you would act on AND the relevant tests GREEN; then evaluate coverage against the behavior list (gaps → back to RED; else hand off).
 
 ## Strict Rules
 

@@ -1,6 +1,6 @@
 # Minimal Implementation: Domain-Specific Patterns
 
-The principle: implement exactly what the test requires, nothing more. Domain specifics:
+The principle: implement exactly what the test requires, nothing more. Examples below are Python; the principle is language-agnostic — translate the shape to your stack. Domain specifics:
 
 ## Math Functions: Direct Formula
 

@@ -56,6 +56,8 @@ test('fetches user', async () => {
 });
 ```
 
+> **Vitest/Mocha:** `expect.assertions` is Jest-only. In Vitest, await the promise directly (`await expect(fetchUser('u-123')).resolves.toEqual(...)`) so an un-awaited rejection fails the run.
+
 ## TypeScript: Type Errors as a Form of RED
 
 A type error is a valid RED state — treat it like an AssertionError: missing property → environment fix; wrong return type → implementation fix. Never add `// @ts-ignore` to bypass a type failure; fix the type as you would a failing assertion.

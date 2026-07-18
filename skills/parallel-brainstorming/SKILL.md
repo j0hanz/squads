@@ -26,17 +26,17 @@ When in doubt whether the request is a bug fix or a feature, treat it as design 
 - **Scan:** Run `python ${CLAUDE_SKILL_DIR}/scripts/scan_context.py <noun1> <noun2> ... --cwd '<root>' | python ${CLAUDE_SKILL_DIR}/scripts/compress_report.py` (fallback to `Grep` if it fails).
 - **Report:** Extract Related Files (with recent commits and test coverage), Interface Shapes, Design Docs, Analogous Features, Constraints, Scope (S/M/L/XL) with reasoning, and Unknowns.
 - **Zero-Code Check:** Stop and offer exit if existing code/config already solves this.
-- **Understanding Lock:** Summarize problem and understanding. Only ask user (via `AskUserQuestion`) if genuine doubts exist; otherwise proceed to Creative Checkpoint.
+- **Understanding Lock:** Summarize problem and understanding. Ask user (via `AskUserQuestion`) only if an Unknowns item blocks approach generation or Scope is L/XL; otherwise proceed to Creative Checkpoint.
 - **Routing:**
   - Scope XL → offer to split into independent sub-features and re-run this skill per slice; if the user declines, set the Phase 5 flag and continue with the XL scope.
   - Ambiguous → Go to Phase 2.
-  - High Risk / Scope L+ → Set Phase 5 Flag.
+  - Scope L/XL, or any scope with a hard non-functional constraint (security, data-loss, perf SLO) → Set Phase 5 Flag.
 
 **Done when:** Context Report lists Related Files, Interface Shapes, Design Docs, Analogous Features, Constraints, Scope (S/M/L/XL), and Unknowns, and zero-code check answered.
 
 ## Phase 2: Clarification
 
-- **Resolve with user:** clarify ambiguous terms via `AskUserQuestion` (max 4 per batch), keeping questions to couple options each.
+- **Resolve with user:** clarify ambiguous terms via `AskUserQuestion`, max 4 questions total, 2-3 options each.
 - **Glossary:** Save resolved definitions to `glossary.md` at the repository root (never `CONTEXT.md`).
 - **Visuals:** Offer diagram only if layout or data flow requires it. Wait for reply.
 
@@ -51,7 +51,7 @@ When in doubt whether the request is a bug fix or a feature, treat it as design 
 
 ## Phase 3: Multi-Lane Divergent Ideation
 
-- **Single-Shot Generation:** Generate 2-3 distinct approaches in one response. **Don't spawn subagents.**
+- **Single-Shot Generation:** Generate 2-3 distinct approaches in one response. **Don't spawn subagents.** Always include the Minimalist lens — it seeds Approach A in Phase 4; pick 1-2 additional lenses from the list.
 - **Context:** Use feature description and Context Report to inform all perspectives.
 - **Lenses (assign one per approach):**
 
@@ -63,7 +63,7 @@ When in doubt whether the request is a bug fix or a feature, treat it as design 
 
 - **Output (per approach):** Idea, core mechanism, winning factor, key risk, first step.
 
-**Done when:** 2-3 distinct approaches generated in one response, each with idea, core mechanism, winning factor, key risk, first step.
+**Done when:** 2-3 distinct approaches generated in one response (one Minimalist), each with idea, core mechanism, winning factor, key risk, first step.
 
 ## Phase 4: Convergence & Synthesis
 

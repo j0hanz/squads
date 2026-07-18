@@ -145,7 +145,7 @@ def main() -> None:
         compressed = compress(raw)
     except TypeError as exc:
         sys.exit(f"error: {exc}")
-    print(json.dumps(compressed, indent=2))
+    print(json.dumps(compressed, separators=(",", ":")))
 
 
 if __name__ == "__main__":

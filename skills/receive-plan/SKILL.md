@@ -55,8 +55,6 @@ Read all critics' findings directly — no Arbiter agent. Dedupe findings by exa
 - Exactly **1 Med** (no High) → APPROVED (note the Med and any Low findings as comment in plan header).
 - **Low** only or nothing → APPROVED (note Low findings as comment in plan header).
 
-REVISE capped at 1 round-trip (see Strict Rules). On 2nd unresolved submission: interactive session → escalate via `AskUserQuestion` to reconcile; autonomous caller (no active terminal) → return itemized failures to requesting skill, which reports and stops (see request-plan's Headless Fallback).
-
 **Done when:** verdict assigned and REVISE cycle, escalation, or APPROVED triggered.
 
 ## Step 5: Finalize

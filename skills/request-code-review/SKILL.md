@@ -23,7 +23,7 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 2. Pick review mode, resolve diff:
    - **Committed** (target is branch, commit, or path):
      1. **Classify target → `head`.** `git rev-parse --verify <target>` succeeds → branch/commit (`head=<target>`); else path (`head=HEAD`, append `-- <target>` to diff in step 5); no target passed → use uncommitted mode instead.
-     2. **Resolve default branch → `$def`.** Loop reassigns on each fallback: `for def in "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" origin/main origin/master origin/develop; do git rev-parse --verify "$def" 2>/dev/null && break; done`. `$def` doesn't verify → abort, report "could not resolve default branch — pass explicit base".
+     2. **Resolve default branch → `$def`.** Source `${CLAUDE_PLUGIN_ROOT}/skills/request-code-review/scripts/resolve-base.sh`; the script loops over the standard candidates and exports `DEF`. `$def` doesn't verify → abort, report "could not resolve default branch — pass explicit base".
      3. **Compute `base`.** `base = git merge-base "$def" "$head"` (or given base).
      4. **Clean-tree check.** Run `git status --porcelain`; dirty → abort, report — committed mode needs clean tree, reviewer may Read working-tree files for context.
      5. **Capture diff.** `git diff "$base".."$head"` (append `-- <path>` if path given in step 1).

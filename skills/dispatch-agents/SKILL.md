@@ -50,9 +50,9 @@ Pick first fit; compose when task demands it.
 
 Exploring _design approaches_ isn't Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there, ideation phases forbid subagents.
 
-Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) by `(file:line, classification)` between rounds, or it never converges.
+Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
 
-Match model to role per [model-tier reference](references/model-tier.md) — cheap/fast for classification and mechanical stages, strongest for judging and verification. One tier rarely fits all seats.
+Match model to role per [model-tier reference](references/model-tier.md).
 
 ## Executing an approved plan
 
@@ -60,8 +60,8 @@ When [receive-plan](../receive-plan/SKILL.md) hands off an APPROVED `docs/plan/<
 
 - **`Depends on:` sets order.** Dispatch task only after everything it depends on completed, validated; tasks with no dependency path between them may run parallel.
 - **`Files:` decides parallel vs. serial.** Overlapping file lists → serial (or isolated worktrees). Disjoint lists → parallel safe. Reads-parallel/writes-serial invariant applied per task.
-- **`Validate:` is structured return.** Each worker runs task's `Validate:` command, reports exit code, output — task without passing validation isn't done. Failed `Validate:` from impl bug (not plan error) routes to `parallel-debugging`, reproduce/isolate root cause before re-fixing; genuinely wrong plan routes to `request-plan`.
-- **`Satisfies:` goes into worker's spec.** Worker gets REQ text it satisfies — knows acceptance criterion, not just action.
+- **`Validate:` is structured return.** Each worker runs task's `Validate:` command, reports exit code, output — task without passing validation isn't done. On pass, terse form: `STATUS: PASS — Validate: <cmd> exit 0; files: <list>`. On fail or partial: full structured return with `file:line` findings (see Invariants). Failed `Validate:` from impl bug (not plan error) routes to `parallel-debugging`, reproduce/isolate root cause before re-fixing; genuinely wrong plan routes to `request-plan`.
+- **`Satisfies:` goes into worker's spec.** Worker gets the REQ-NNN IDs from the task and the corresponding REQ text blocks pulled from `specs.md` — knows acceptance criterion, not just action.
 
 **Done when:** every task in plan dispatched in dependency order, returned passing `Validate:` exit code, or failing task routed to `parallel-debugging` (impl bug) / `request-plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint, no separate run file.
 

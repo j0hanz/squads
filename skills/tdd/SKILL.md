@@ -57,10 +57,10 @@ _For an approved-plan handoff, derive these from the task block instead of askin
 
 _If JavaScript/TypeScript, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/references/js-ts-patterns.md` fully._
 
-1. Write the smallest test for one behavior.
-2. Stub the implementation (e.g. `return null`) — just enough to compile/run.
-3. Run the test.
-4. **Gate:** confirm FAILURE. A test that passes immediately tests nothing — delete and rewrite it.
+1.1. Write the smallest test for one behavior.
+1.2. Stub the implementation (e.g. `return null`) — just enough to compile/run. (Skip in `parallel-debugging` autonomous handoff — implementation already exists; see that paragraph in this skill.)
+1.3. Run the test.
+1.4. **Gate:** confirm FAILURE. A test that passes immediately tests nothing — delete and rewrite it.
 
 **Done when:** the test runs and fails for the targeted behavior (RED confirmed), not the environment.
 

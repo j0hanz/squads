@@ -112,7 +112,7 @@ Detail: [Specific requirement statement]
 - **NO Re-Scan**: pass Context Report to ideators; must not run own discovery.
 - **NO Cross-Talk**: ideators must never see each other's proposals.
 - **NO Mocked Ideators**: ideators must be distinct subagents; main thread can't generate them itself.
-- **NO Shell Execution**: don't run arbitrary shell commands during discovery, drafting, or synthesis.
+- **NO Shell Execution** during discovery, drafting, or synthesis, except `scripts/scan_context.py` for codebase scanning (the same exemption `parallel-brainstorming` uses in Phase 1).
 - **NO Schema at Draft Stage**: ideators write lightweight proposals; schema synthesis-only.
 
 ## Next Skills

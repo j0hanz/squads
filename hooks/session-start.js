@@ -11,6 +11,8 @@ try {
   // Strip YAML frontmatter:
   // It starts with --- and ends with ---
   const cleaned = rawContent.replace(/^---[\s\S]*?---\r?\n/, '');
+
+  // Check for reserved sentinels in the cleaned content
   if (
     cleaned.includes('<squads-router>') ||
     cleaned.includes('</squads-router>') ||

@@ -118,5 +118,5 @@ Request: "add a way for users to save and re-run searches."
 
 | Skill                                          | Use Case                                                               |
 | :--------------------------------------------- | :--------------------------------------------------------------------- |
-| [request-plan](../request-plan/SKILL.md)       | Formalize Design Brief into task plan when auto-commit declined        |
+| [request-plan](../request-plan/SKILL.md)       | Formalize Design Brief into task plan                                  |
 | [dispatch-agents](../dispatch-agents/SKILL.md) | Execute plan once request-plan formalizes and receive-plan APPROVES it |

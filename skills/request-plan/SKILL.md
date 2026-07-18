@@ -22,8 +22,7 @@ No `AskUserQuestion`. Resolve in order:
 
 1. `--depth` flag on the invocation → use it.
 2. Keywords in description → `sketch`: "throwaway / rough / spike / quick note / temporary"; `blueprint`: "production / migration / rollout / breaking change / compliance / security / structural".
-3. Autonomous caller (subagent/automation, no active terminal) with no depth signal → `contract`.
-4. Default → `contract`.
+3. Default → `contract`.
 
 Announce the inferred depth and subagent count in the first line of output. Do not pause.
 

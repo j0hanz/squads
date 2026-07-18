@@ -44,7 +44,11 @@ fi
 if [[ "$prompt" == *'fresh-eyed reviewer'* ]]; then
   # Marker string is request-code-review's fixed template — keep in sync if that wording changes.
   session_id=$(jq -r '.session_id // "no-session-id"' <<<"$input" | tr -cd 'a-zA-Z0-9-')
-  count_file="${TMPDIR:-/tmp}/squads-review-count-${session_id:-no-session-id}"
+  # Key the cap per reviewed change (the "Change summary:" line the template
+  # always includes), not per session — otherwise N unrelated reviews in one
+  # session trip the cap on the Nth review instead of the 3rd pass of one change.
+  change_key=$(grep -m1 '^Change summary:' <<<"$prompt" | cksum | awk '{print $1}')
+  count_file="${TMPDIR:-/tmp}/squads-review-count-${session_id:-no-session-id}-${change_key:-0}"
 
   if [[ -f "$count_file" && -n "$(find "$count_file" -mmin +120 2>/dev/null)" ]]; then
     rm -f "$count_file"
@@ -52,7 +56,7 @@ if [[ "$prompt" == *'fresh-eyed reviewer'* ]]; then
 
   count=$(($(cat "$count_file" 2>/dev/null || echo 0) + 1))
   if ((count > 2)); then
-    deny "3rd reviewer dispatch this session — receive-code-review caps re-review at 2 passes (No Re-Review Loops). Escalate to the user instead; after they approve another pass, remove $count_file."
+    deny "3rd reviewer dispatch for this change — receive-code-review caps re-review at 2 passes (No Re-Review Loops). Escalate to the user instead; after they approve another pass, remove $count_file."
   fi
   printf '%s' "$count" >"$count_file"
 fi

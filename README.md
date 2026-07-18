@@ -1,19 +1,19 @@
 # Squads
 
-![License](https://img.shields.io/github/license/j0hanz/squads?style=for-the-badge)
+![Version](https://img.shields.io/github/package-json/v/j0hanz/squads?style=for-the-badge&label=version)
 
-`squads` is a Claude Code plugin of skills for multi-agent planning, code review, and test-driven development workflows. It exists to give Claude a small, opinionated lifecycle — brainstorm → plan → execute → review — so a task routes to the right skill instead of you remembering which command to run.
+A Claude Code plugin with skills for collaborative software development. Each skill covers one stage of the development lifecycle, from brainstorming and planning through implementation, debugging, and code review.
 
 ## Features
 
 Eight skills, each with a single job, that hand off along one lifecycle:
 
-- **parallel-brainstorming** — explore a vague or open problem before any plan exists.
-- **request-plan** / **receive-plan** — draft a plan or spec, then validate it before execution.
-- **dispatch-agents** — execute an approved plan across multiple agents.
-- **tdd** — implement new logic test-first; flags tests written after the code.
-- **parallel-debugging** — reproduce and isolate an unexpected failure before fixing it.
-- **request-code-review** / **receive-code-review** — get a fresh-eye review on a diff, then resolve the feedback.
+- **parallel-brainstorming**: explore a vague or open problem before any plan exists.
+- **request-plan** / **receive-plan**: draft a plan or spec, then validate it before execution.
+- **dispatch-agents**: execute an approved plan across multiple agents.
+- **tdd**: implement new logic test-first; flags tests written after the code.
+- **parallel-debugging**: reproduce and isolate an unexpected failure before fixing it.
+- **request-code-review** / **receive-code-review**: get a fresh-eye review on a diff, then resolve the feedback.
 
 ## Install
 
@@ -24,7 +24,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or runtime dependency — the plugin is markdown skills plus one Node hook.
+> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or runtime dependency; the plugin is markdown skills plus one Node hook.
 
 ## Usage
 
@@ -36,7 +36,7 @@ On every session start, clear, and compact, the `using-squads` router is injecte
 /squads:tdd                     "parse a duration string into seconds"
 ```
 
-When unsure which skill fits, start upstream — brainstorm or plan — before executing or reviewing.
+When unsure which skill fits, start upstream (brainstorm or plan) before executing or reviewing.
 
 ### Lifecycle
 

@@ -1,6 +1,6 @@
 {
   "name": "squads",
-  "description": "",
+  "description": "Plugin for multi-agent workflows in Claude Code",
   "owner": {
     "name": "j0hanz",
     "email": "l.johansson93@outlook.com"

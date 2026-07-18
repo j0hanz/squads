@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "squads",
   "version": "0.1.0",
-  "description": "",
+  "description": "A plugin for multi-agent workflows like planning, code review, and test-driven development",
   "license": "MIT",
   "author": {
     "name": "j0hanz",

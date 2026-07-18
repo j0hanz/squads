@@ -23,21 +23,9 @@ Escape hatches from the HARD GATE. Never self-invoke one silently — confirm vi
 
 ## Autonomous invocation (approved-plan handoff)
 
-When invoked by `receive-plan` or `dispatch-agents` with a task from an
-APPROVED `docs/plan/<name>.plan.md`, skip Step 0 and the Pre-TDD
-`AskUserQuestion` gates — plan approval already locked scope and interface.
-Derive the interface, error conditions, and test path from the task block's
-`Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:` fields, state
-them in one line, and enter the TDD Cycle at RED. All other gates (observed
-RED, N-1 check, Red Flags) still apply unchanged.
+When invoked by `receive-plan` or `dispatch-agents` with a task from an APPROVED `docs/plan/<name>.plan.md`, skip Step 0 and the Pre-TDD `AskUserQuestion` gates — plan approval already locked scope and interface. Derive the interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:` fields, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
 
-When invoked by `parallel-debugging` with a minimal repro as the RED test, skip Step 0
-and the Pre-TDD `AskUserQuestion` gates — the reproducing case and root-cause
-isolation are already locked. Derive the behavior under test from the repro
-and its verbatim failing output, state it in one line, and enter the TDD Cycle
-at RED. Skip Step 1 sub-step 2 (stub) — the implementation already exists and is the
-source of the failure; run the repro test against the existing code and confirm
-RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
+When invoked by `parallel-debugging` with a minimal repro as the RED test, skip Step 0 and the Pre-TDD `AskUserQuestion` gates — the reproducing case and root-cause isolation are already locked. Derive the behavior under test from the repro and its verbatim failing output, state it in one line, and enter the TDD Cycle at RED. Skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure; run the repro test against the existing code and confirm RED. All other gates still apply unchanged.
 
 ## Step 0: Confirm Scope
 
@@ -63,7 +51,7 @@ _For an approved-plan handoff, derive these from the task block instead of askin
 - Start the **behavior list**: happy path + the enumerated errors; it grows by one edge case per RED cycle and is the coverage gauge for REFACTOR.
 - **Gate:** run the relevant existing tests first — establish a clean baseline before adding new tests. If the baseline is RED, stop: route the pre-existing failure to `parallel-debugging`, or get user confirmation to proceed with the failing tests recorded and excluded from this cycle's GREEN criterion.
 
-**Done when:** interface details, errors, and test path are locked and user confirms.
+**Done when:** interface details, errors, and test path are locked and the user confirms.
 
 ## Step 1: RED (Failing Test)
 

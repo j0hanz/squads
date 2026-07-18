@@ -1,6 +1,6 @@
 # Minimal Implementation: Domain-Specific Patterns
 
-The principle: implement exactly what the test requires, nothing more. Examples below are Python; the principle is language-agnostic — translate the shape to your stack. Domain specifics:
+The principle: implement exactly what the test requires, nothing more. Examples are Python; translate the shape to your stack.
 
 ## Math Functions: Direct Formula
 
@@ -19,7 +19,7 @@ def calculate_discount(price, discount_percent):
     return price * (1 - discount_percent / 100)
 ```
 
-When the validation test arrives (later), add it then.
+Add the validation when its test arrives.
 
 ## Validation Functions: Simple Boolean Check
 
@@ -37,7 +37,7 @@ def validate_email(self, email):
     return bool(re.match(r'^[^@]+@[^@]+\.[^@]+$', email))
 ```
 
-When the RFC-compliance test arrives (later), add it then.
+Add the regex when the RFC-compliance test arrives.
 
 ## Parsing / String Processing: Iterate As Needed
 
@@ -84,4 +84,4 @@ def _contains_required_character(self, text, char):
     return char in text
 ```
 
-Wait until actual duplication appears; don't "just in case" extract.
+Extract only when actual duplication appears — not "just in case".

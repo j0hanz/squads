@@ -21,7 +21,7 @@ argument-hint: '[task or situation to route]'
 | A verified diff needing a fresh-eye review before merge                                                              | [request-code-review](../request-code-review/SKILL.md)       |
 | Review feedback (human, bot, or subagent) to resolve                                                                 | [receive-code-review](../receive-code-review/SKILL.md)       |
 
-If two rows could fit, the earlier one wins: ideation precedes planning, planning precedes execution, a bug precedes its fix. When in doubt, start upstream (brainstorm/plan) rather than mid-workflow (execute/review).
+If two rows could fit, the earlier one wins: ideation precedes planning, planning precedes execution, a bug precedes its fix. When in doubt, start upstream (brainstorm/plan) over mid-workflow (execute/review).
 
 ## Lifecycle — how skills hand off
 

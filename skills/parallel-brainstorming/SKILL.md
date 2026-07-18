@@ -7,11 +7,7 @@ argument-hint: '[feature request or problem to explore]'
 # parallel-brainstorming
 
 <HARD-GATE>
-Don't propose code, file changes, or concrete implementation plan for new feature or ambiguous
-request until Phase 6 produces a Design Brief for an approach the user locked in Phase 4 (and,
-if Phase 5 ran, that Phase 5 marked `APPROVED`). Sketching approach in doc is still
-design work — needs Phase 1 Discovery first. Doesn't apply to bug fixes, typos, one-line
-config changes with no design space.
+Don't propose code, file changes, or concrete implementation plan for new feature or ambiguous request until Phase 6 produces a Design Brief for an approach the user locked in Phase 4 (and, if Phase 5 ran, that Phase 5 marked `APPROVED`). Sketching approach in doc is still design work — needs Phase 1 Discovery first. Doesn't apply to bug fixes, typos, one-line config changes with no design space.
 When in doubt whether the request is a bug fix or a feature, treat it as design work and run Phase 1 — the bug-fix exemption must not be used to skip Discovery.
 </HARD-GATE>
 
@@ -106,7 +102,7 @@ Request: "add a way for users to save and re-run searches."
 
 1. **Phase 1:** Scan finds existing `Filter` model and one-off "recent searches" list in `localStorage`. Scope: M. No flag (not high-risk, not L/XL).
 2. **Creative Checkpoint:** Minimalist seed found — extend `Filter` with `name` + `saved: boolean` column instead of new table.
-3. **Phase 3 (Multi-lane generation):** Conventional — new `SavedSearch` table + CRUD API, mirrors `Bookmark` feature. Minimalist — reuse `Filter` + 2 columns, no new endpoints (piggyback on existing filter-list endpoint). Constraint-First — same as Minimalist but adds per-user cap (20 saved searches) to bound query cost.
+3. **Phase 3 (Multi-lane generation):** Conventional — new `SavedSearch` table + CRUD API, mirrors `Bookmark`. Minimalist — reuse `Filter` + 2 columns, no new endpoints (piggyback on existing filter-list endpoint). Constraint-First — same as Minimalist but adds per-user cap (20 saved searches) to bound query cost.
 4. **Phase 4:** Synthesize 2 approaches — Approach A (Minimalist + cap, cheapest) and Approach B (Conventional, more flexible but new table + endpoints). User picks A. Not flagged → skip Phase 5.
 5. **Phase 6:** Design Brief written to `docs/design/2026-06-29-saved-searches-design.md`: Approach (extend `Filter`), Why (reuses existing model, smallest diff), Scope (M), Constraints (cap 20/user), Interface (`Filter.saved`, `Filter.name`), Architecture (no new table), Risks (cap needs migration default), First Step (`ALTER TABLE filters ADD COLUMN saved boolean DEFAULT false`).
 6. Commit Guard: user declines auto-commit → brief left in chat + on disk; handoff to `request-plan` to formalize tasks.

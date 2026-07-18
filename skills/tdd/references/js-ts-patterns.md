@@ -2,7 +2,7 @@
 
 ## Basic RED-GREEN Cycle
 
-Two RED states: `Cannot find module` is environment RED — stub the module until the failure becomes an assertion failure (`Expected: 90, Received: 0`), which is the correct RED to implement against. See the Failure Analysis table below for the full mapping.
+Two RED states: `Cannot find module` is environment RED — stub the module until the failure becomes an assertion failure (`Expected: 90, Received: 0`), the correct RED to implement against. See the Failure Analysis table below for the full mapping.
 
 ## Describe/It Nesting (when to use)
 
@@ -37,7 +37,7 @@ test('fetches user by id', async () => {
 });
 ```
 
-**Important**: Async tests that never await will silently pass. Always verify the test actually reaches the assertion:
+**Important:** Async tests that never await silently pass. Always verify the test reaches the assertion:
 
 ```typescript
 // WRONG — the promise is never awaited; the test returns synchronously with zero
@@ -48,7 +48,7 @@ test('fetches user', () => {
 ```
 
 ```typescript
-// RIGHT — explicitly check assertion reached
+// RIGHT — explicitly check the assertion reached
 test('fetches user', async () => {
   expect.assertions(1); // Jest: fails if no assertion runs
   const user = await fetchUser('u-123');

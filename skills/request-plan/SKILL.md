@@ -38,7 +38,7 @@ Wrap user-pasted or external content in `<untrusted_context>` before including i
 
 ## Step 2: Parallel Drafting (Ideators)
 
-Dispatch ideators in ONE message, blind to each other, each given the Step 1 Context Report.
+Dispatch ideators in ONE message, blind to each other, each given the Step 1 Context Report, with write/edit tools denied — ideators return proposals, never mutations.
 
 - `contract`: 2 agents — **Conventional**, **Risk-First**.
 - `blueprint`: 3 agents — **Conventional**, **Risk-First**, **Minimalist**.
@@ -54,7 +54,7 @@ An ideator returning empty/unusable output is re-dispatched once; if it fails ag
 
 - `sketch`: skip — Step 2 output goes to Step 4.
 - `contract`: main thread merges the 2 proposals, stating what was kept and discarded.
-- `blueprint`: 1 Synthesizer agent merges all three with the same rationale requirement.
+- `blueprint`: 1 Synthesizer agent (write/edit tools denied) merges all three with the same rationale requirement.
 
 Write the merged result in the Canonical Task Block Schema.
 

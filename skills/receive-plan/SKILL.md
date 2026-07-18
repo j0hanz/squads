@@ -34,7 +34,7 @@ Report `N_passed / N_total` per category. Any `N_passed < N_total` → REVISE wi
 
 ## Step 3: One Critic Agent
 
-Dispatch **1 critic subagent** covering all lenses in a single pass. Default to the full deep check (depth=blueprint); if depth is `contract`, run the lighter check focused on scope boundaries and dependency cycles.
+Dispatch **1 critic subagent** (write/edit tools denied) covering all lenses in a single pass. Default to the full deep check (depth=blueprint); if depth is `contract`, run the lighter check focused on scope boundaries and dependency cycles.
 
 - **Spec-Correctness** — spec is complete and consistent.
 - **Dependency Order** — task sequencing is logical and acyclic.

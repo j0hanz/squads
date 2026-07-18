@@ -48,7 +48,7 @@ When in doubt whether the request is a bug fix or a feature, treat it as design 
 
 ## Phase 3: Multi-Lane Divergent Ideation
 
-- **Single-Shot Generation:** Generate 2-3 distinct approaches in one response. **Don't spawn subagents.** Always include the Minimalist lens — it seeds Approach A in Phase 4; pick 1-2 additional lenses from the list.
+- **Single-Shot Generation:** Generate 2-3 distinct approaches in one response. Always include the Minimalist lens — it seeds Approach A in Phase 4; pick 1-2 additional lenses from the list.
 - **Context:** Use feature description and Context Report to inform all perspectives.
 - **Lenses (assign one per approach):**
 

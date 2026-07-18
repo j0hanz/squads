@@ -1,6 +1,6 @@
 ---
 name: using-squads
-description: Entry skill for the `squads` plugin, routing every task to dispatch-agents, which triages it and selects the multi-agent workflow.
+description: Router preamble injected by the session-start hook — routes every incoming task to dispatch-agents for triage and workflow selection. Never invoked directly.
 user-invocable: false
 disable-model-invocation: true
 argument-hint: '[task or situation to route]'

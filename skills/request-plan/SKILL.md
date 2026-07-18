@@ -68,10 +68,10 @@ Save `docs/plan/<kebab-name>.specs.md` and `docs/plan/<kebab-name>.plan.md` with
 
 ## Step 5: Verification
 
-- `sketch`: done — no handoff.
+- `sketch`: done — no verification handoff. A sketch plan is a working note: it stays `Status: DRAFT`, is never submitted to `receive-plan` (which rejects sketch by design), and never enters `dispatch-agents`' approved-plan execution. Implement it directly — main thread for trivial edits, or [tdd](../tdd/SKILL.md) (interactive path) for a single logic behavior — treating its task list as guidance, not an executable contract.
 - `contract` / `blueprint`: pass file paths + depth to `receive-plan` so it does not run a heavier check than necessary.
 
-**Done when:** sketch ends with no handoff, or contract/blueprint paths + depth passed to `receive-plan`.
+**Done when:** sketch ends with its direct-implementation route stated, or contract/blueprint paths + depth passed to `receive-plan`.
 
 ## Headless Fallback (REVISE from receive-plan)
 

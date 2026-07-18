@@ -8,37 +8,37 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 
 ## Strict Rules
 
-- **Fresh context only.** Never review your own diff in-thread; always dispatch a subagent.
-- **Read-only reviewer.** Deny write/edit tools in the subagent invocation — it reads, never mutates.
-- **Verbatim output.** Never edit, correct, or translate the review; paste it as-is.
-- **No direct fixes on FAIL.** Route FAIL to `receive-code-review`; do not patch here.
-- **No unresolved placeholders reach the subagent.** Replace every `{{...}}` in the dispatch prompt with real values before dispatching.
-- **No working-tree mutation to force clean.** Never `stash`/`checkout`/`reset`; if the tree is dirty in committed mode, abort and report.
+- **Fresh context only.** Never review own diff in-thread. Always dispatch subagent.
+- **Read-only reviewer.** Deny write/edit tools in subagent invocation. Reads, never mutates.
+- **Verbatim output.** Never edit, correct, translate review. Paste as-is.
+- **No direct fixes on FAIL.** Route FAIL to `receive-code-review`. Don't patch here.
+- **No unresolved placeholders reach subagent.** Replace every `{{...}}` in dispatch prompt with real values before dispatching.
+- **No working-tree mutation to force clean.** Never `stash`/`checkout`/`reset`. If tree dirty in committed mode, abort and report.
 
 ## Steps
 
 ### Step 1: Verify prerequisites
 
-1. Find covering tests by convention (sibling `*.test.*`/`*.spec.*`/`*_test.*`/`test_*` files of changed files) and by `git grep -l "<changed-exported-symbol>"` for changed exports. Run exactly those; paste fresh output. If any covering test fails, abort and report — never dispatch a review of a failing diff. If no tests cover the diff, say so explicitly and get user confirmation before proceeding; the dispatch summary must note the missing coverage.
-2. Pick the review mode and resolve the diff:
-   - **Committed** (target is a branch, commit, or path):
-     1. **Classify the target → `head`.** If `git rev-parse --verify <target>` succeeds, it is a branch/commit (`head=<target>`); otherwise it is a path (`head=HEAD`, append `-- <target>` to the diff in step 5); if no target was passed, use uncommitted mode instead.
-     2. **Resolve the default branch → `$def`.** Loop that reassigns on each fallback: `for def in "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" origin/main origin/master origin/develop; do git rev-parse --verify "$def" 2>/dev/null && break; done`. If `$def` does not verify, abort and report "could not resolve default branch — pass an explicit base".
-     3. **Compute `base`.** `base = git merge-base "$def" "$head"` (or the given base).
-     4. **Clean-tree check.** Run `git status --porcelain`; if dirty, abort and report — committed mode requires a clean tree because the reviewer may Read working-tree files for context.
-     5. **Capture the diff.** `git diff "$base".."$head"` (append `-- <path>` if a path was given in step 1).
-   - **Uncommitted** (target is the working tree): capture `git diff` plus `git diff --staged` as the diff text block.
-3. Guard against an empty diff:
-   - **Committed**: run `git diff --stat "$base".."$head"` (append `-- <path>` if a path was given). If empty, abort and report.
-   - **Uncommitted**: run `git diff --stat HEAD` (covers staged + unstaged vs `HEAD`). If that is empty AND `git status --porcelain` shows no untracked (`??`) entries, abort and report. (Untracked files are not in `git diff` but are reviewable changes, so they must not trigger a false abort.)
-4. **Done when:** tests are green, a non-empty diff is in hand, and (committed mode) the tree is clean.
+1. Find covering tests by convention (sibling `*.test.*`/`*.spec.*`/`*_test.*`/`test_*` files of changed files) and by `git grep -l "<changed-exported-symbol>"` for changed exports. Run exactly those; paste fresh output. Any covering test fails → abort, report — never dispatch review of failing diff. No tests cover diff → say so explicit, get user confirmation before proceeding; dispatch summary must note missing coverage.
+2. Pick review mode, resolve diff:
+   - **Committed** (target is branch, commit, or path):
+     1. **Classify target → `head`.** `git rev-parse --verify <target>` succeeds → branch/commit (`head=<target>`); else path (`head=HEAD`, append `-- <target>` to diff in step 5); no target passed → use uncommitted mode instead.
+     2. **Resolve default branch → `$def`.** Loop reassigns on each fallback: `for def in "$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" origin/main origin/master origin/develop; do git rev-parse --verify "$def" 2>/dev/null && break; done`. `$def` doesn't verify → abort, report "could not resolve default branch — pass explicit base".
+     3. **Compute `base`.** `base = git merge-base "$def" "$head"` (or given base).
+     4. **Clean-tree check.** Run `git status --porcelain`; dirty → abort, report — committed mode needs clean tree, reviewer may Read working-tree files for context.
+     5. **Capture diff.** `git diff "$base".."$head"` (append `-- <path>` if path given in step 1).
+   - **Uncommitted** (target is working tree): capture `git diff` plus `git diff --staged` as diff text block.
+3. Guard against empty diff:
+   - **Committed**: run `git diff --stat "$base".."$head"` (append `-- <path>` if path given). Empty → abort, report.
+   - **Uncommitted**: run `git diff --stat HEAD` (covers staged + unstaged vs `HEAD`). Empty AND `git status --porcelain` shows no untracked (`??`) entries → abort, report. (Untracked files not in `git diff` but reviewable changes — must not trigger false abort.)
+4. **Done when:** tests green, non-empty diff in hand, and (committed mode) tree clean.
 
-### Step 2: Dispatch the reviewer
+### Step 2: Dispatch reviewer
 
-1. Fill the dispatch prompt below, then dispatch one subagent with write/edit tools denied. `{{plan_summary}}` = one or two sentences stating the change's intent, taken from the plan task or the commit message(s) in `"$base".."$head"`; if neither exists, derive it from the diff before dispatching. `{{diff}}` = the diff captured in Step 1.
-2. The subagent must return these headers exactly: `## Code Review Result`, `**Status**: PASS|FAIL`, `### Blocking Issues`, `### Advisory Issues`, `### What Was Checked`.
-3. If any header is missing or malformed, retry once with a reminder; a second failure aborts the review.
-4. **Done when:** the subagent returns well-formed output with all required headers.
+1. Fill dispatch prompt below, dispatch one subagent, write/edit tools denied. `{{plan_summary}}` = one-two sentences stating change's intent, taken from plan task or commit message(s) in `"$base".."$head"`; neither exists → derive from diff before dispatching. `{{diff}}` = diff captured Step 1.
+2. Subagent must return these headers exactly: `## Code Review Result`, `**Status**: PASS|FAIL`, `### Blocking Issues`, `### Advisory Issues`, `### What Was Checked`.
+3. Header missing or malformed → retry once w/ reminder; second failure aborts review.
+4. **Done when:** subagent returns well-formed output, all required headers.
 
 #### Dispatch prompt
 
@@ -62,10 +62,10 @@ Check correctness, security, edge cases, and reuse/simplification, then reply st
 
 ### Step 3: Hand off
 
-1. Paste the subagent's output verbatim to the user.
+1. Paste subagent's output verbatim to user.
 2. On **PASS**: prompt "Changes are ready — commit and push / open a PR."
-3. On **FAIL**: invoke `receive-code-review`, passing along the re-review pass number if one was given (its 2-pass cap depends on it). Do not fix findings directly.
-4. **Done when:** the verbatim review is surfaced and the PASS or FAIL route is taken.
+3. On **FAIL**: invoke `receive-code-review`, pass along re-review pass number if given (its 2-pass cap depends on it). Don't fix findings directly.
+4. **Done when:** verbatim review surfaced, PASS or FAIL route taken.
 
 ## Next Skills
 

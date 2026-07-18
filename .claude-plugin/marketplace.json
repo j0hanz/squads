@@ -1,6 +1,6 @@
 {
   "name": "squads",
-  "description": "Plugin for multi-agent workflows in Claude Code",
+  "description": "Plugin for multi-agent workflows",
   "owner": {
     "name": "j0hanz",
     "email": "l.johansson93@outlook.com"
@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "squads",
-      "description": "",
+      "description": "A plugin for multi-agent planning, review, and test-driven development",
       "version": "0.1.0",
       "source": "./",
       "author": {

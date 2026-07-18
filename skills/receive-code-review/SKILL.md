@@ -1,6 +1,7 @@
 ---
 name: receive-code-review
 description: Use when code review feedback has been received from a human, bot, or subagent. Prefer over request-code-review when resolving feedback rather than requesting a new review.
+argument-hint: '[review feedback to resolve]'
 ---
 
 # receive-code-review

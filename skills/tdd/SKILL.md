@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Use when new logic requires implementation, or when a TDD red flag appears — a trivially passing test, code written before its test, or GREEN with no observed RED. Not for multi-task work without an approved plan — use request-plan first.
+description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Multi-task work needs request-plan first.
 argument-hint: '[feature or behavior to implement]'
 ---
 

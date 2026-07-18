@@ -1,6 +1,7 @@
 ---
 name: dispatch-agents
 description: Use when a task exceeds one context window — many independent items or unbiased checks — or an APPROVED docs/plan/*.plan.md needs execution. Not for design ideation — use parallel-brainstorming.
+argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 ---
 
 # dispatch-agents

@@ -1,6 +1,6 @@
 ---
 name: parallel-debugging
-description: Use when a test, Validate command, or runtime behavior fails unexpectedly — before any fix, even when the root cause looks obvious or is already suspected. Prefer over tdd when the bug must be reproduced and isolated, not implemented fresh.
+description: Use when a test, Validate command, or runtime behavior fails unexpectedly — before any fix. Prefer over tdd when the bug must be reproduced and isolated, not implemented fresh.
 argument-hint: '[symptom: failing test, command, or error]'
 ---
 

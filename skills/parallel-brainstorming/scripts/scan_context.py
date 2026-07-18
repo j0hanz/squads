@@ -140,7 +140,7 @@ def _git_log(path: str, cwd: Path) -> str:
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
-    except FileNotFoundError, subprocess.TimeoutExpired:
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         return "no history"
     if result.returncode != 0:
         return "no history"
@@ -286,7 +286,7 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
             tree = ast.parse(
                 file_path.read_text(encoding="utf-8", errors="ignore")
             )
-        except SyntaxError, OSError:
+        except (SyntaxError, OSError):
             return []
         for node in ast.walk(tree):
             if isinstance(node, ast.ClassDef) and any(

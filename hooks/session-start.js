@@ -16,9 +16,14 @@ try {
     // Strip YAML frontmatter:
     // It starts with --- and ends with ---
     const cleaned = rawContent.replace(/^---[\s\S]*?---\r?\n/, '');
-    if (cleaned.includes('</squads-router>') || cleaned.includes('<system-reminder')) {
+    if (
+      cleaned.includes('<squads-router>') ||
+      cleaned.includes('</squads-router>') ||
+      cleaned.includes('<system-reminder')
+    ) {
       console.error('squads: refusing to inject router content containing reserved sentinels');
     } else {
+      process.stdout.write('<squads-router>\n');
       process.stdout.write(cleaned);
     }
   } else {

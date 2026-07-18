@@ -74,8 +74,12 @@ def check_frontmatter(file_path, dir_name):
     else:
         desc_value = desc_match.group(1).strip()
 
-        # Check 3: starts with 'Use when'
-        if not desc_value.startswith("Use when"):
+        # Check 3: starts with 'Use when' — skip for non-invocable skills
+        # (router skills injected by hook are never triggered by description)
+        invocable = not re.search(
+            r"^user-invocable:\s*false\s*$", frontmatter, re.MULTILINE
+        )
+        if invocable and not desc_value.startswith("Use when"):
             failures.append(
                 (file_path, "description does not start with 'Use when'")
             )

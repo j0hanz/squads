@@ -25,7 +25,7 @@
         ]
       },
       {
-        "matcher": "Skill|Write|Edit",
+        "matcher": "Skill|Write|Edit|NotebookEdit",
         "hooks": [
           {
             "type": "command",

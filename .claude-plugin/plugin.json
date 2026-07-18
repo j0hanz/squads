@@ -1,13 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "squads",
-  "version": "0.1.0",
   "description": "A plugin for multi-agent workflows like planning, code review, and test-driven development",
+  "version": "0.1.0",
   "license": "MIT",
   "author": {
     "name": "j0hanz",
     "email": "l.johansson93@outlook.com"
   },
   "repository": "https://github.com/j0hanz/squads",
-  "homepage": "https://github.com/j0hanz/squads"
+  "homepage": "https://github.com/j0hanz/squads",
+  "keywords": [
+    "squads",
+    "multi-agent",
+    "parallel-subagents",
+    "agentic-workflow",
+    "agentic",
+    "orchestration",
+    "test-driven-development",
+    "tdd"
+  ]
 }

@@ -22,6 +22,7 @@ import os
 import re
 import subprocess
 import sys
+from collections import Counter
 from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
@@ -75,6 +76,9 @@ _DOC_GLOBS = [
     "docs/design/*.md",
 ]
 _MAX_DOC_DEPTH = 4  # 4: deepest glob is 3 segments + one nesting prefix; bounds the walk on large repos
+# Pre-build (glob, */glob) pairs once so _find_doc_files avoids per-file string alloc
+_DOC_GLOB_PAIRS: list[tuple[str, str]] = [(g, "*/" + g) for g in _DOC_GLOBS]
+
 _CONSTRAINT_PATTERNS = [
     "TODO",
     "FIXME",
@@ -85,6 +89,8 @@ _CONSTRAINT_PATTERNS = [
     "timeout",
     "max_size",
 ]
+# Pre-lowercased once so _scan_constraints avoids pat.lower() inside the hot loop
+_CONSTRAINT_PATTERNS_LOWER = [p.lower() for p in _CONSTRAINT_PATTERNS]
 
 # Adjacent synonyms for common domain verbs/nouns used in analogous feature detection
 _SYNONYM_MAP: dict[str, list[str]] = {
@@ -105,7 +111,8 @@ _SYNONYM_MAP: dict[str, list[str]] = {
     "download": ["export", "fetch", "stream", "serve"],
 }
 
-# Regex patterns for extracting named types from non-Python source files
+# Regex patterns for extracting named types from non-Python source files.
+# Compiled once at module load to avoid recompilation on every file processed.
 _LANG_TYPE_PATTERNS: dict[str, str] = {
     ".ts": r"(?:interface|type|class|enum)\s+(\w+)",
     ".tsx": r"(?:interface|type|class|enum)\s+(\w+)",
@@ -116,14 +123,16 @@ _LANG_TYPE_PATTERNS: dict[str, str] = {
     ".kt": r"(?:class|interface|object|data class)\s+(\w+)",
     ".swift": r"(?:class|struct|enum|protocol)\s+(\w+)",
 }
+_LANG_TYPE_REGEXES: dict[str, re.Pattern[str]] = {
+    ext: re.compile(pat) for ext, pat in _LANG_TYPE_PATTERNS.items()
+}
 
 
-def _dedupe_stable(items: Iterable[object]) -> list[str]:
+def _dedupe_stable(items: Iterable[str]) -> list[str]:
     """Deduplicate preserving first-occurrence order."""
     seen: set[str] = set()
     result: list[str] = []
     for item in items:
-        item = item if isinstance(item, str) else str(item)
         key = item.strip().lower()
         if key not in seen:
             seen.add(key)
@@ -271,17 +280,16 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
 
 
 def _find_doc_files(cwd: Path) -> list[str]:
-    buckets: list[list[str]] = [[] for _ in _DOC_GLOBS]
+    buckets: list[list[str]] = [[] for _ in _DOC_GLOB_PAIRS]
     for root, dirnames, filenames in os.walk(cwd):
-        # prune skip-dirs in place; sorted for run-to-run determinism
         dirnames[:] = sorted(d for d in dirnames if d not in _SKIP_DIRS)
         rel_root = Path(root).relative_to(cwd)
         if len(rel_root.parts) >= _MAX_DOC_DEPTH:
-            dirnames[:] = []  # deep enough — stop descending
+            dirnames[:] = []
         for name in sorted(filenames):
             rel = (rel_root / name).as_posix()
-            for i, g in enumerate(_DOC_GLOBS):
-                if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, "*/" + g):
+            for i, (g, prefixed_g) in enumerate(_DOC_GLOB_PAIRS):
+                if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, prefixed_g):
                     buckets[i].append(rel)
                     break
     return [p for bucket in buckets for p in bucket]
@@ -316,15 +324,20 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
 
 def _scan_constraints(file_path: Path) -> list[str]:
     """Scan a file for constraint signals (TODOs, rate limits, timeouts)."""
+    hits: list[str] = []
     try:
-        text = file_path.read_text(encoding="utf-8-sig", errors="replace")
+        with file_path.open(encoding="utf-8-sig", errors="replace") as fh:
+            for line_no, line in enumerate(fh, 1):
+                ll = line.lower()
+                if any(pat in ll for pat in _CONSTRAINT_PATTERNS_LOWER):
+                    hits.append(
+                        f"{file_path.name}:{line_no}: {line.strip()[:120]}"
+                    )
+                    if len(hits) == 3:  # cap reached — stop reading early
+                        break
     except OSError:
         return []
-    hits: list[str] = []
-    for line_no, line in enumerate(text.splitlines(), 1):
-        if any(pat.lower() in line.lower() for pat in _CONSTRAINT_PATTERNS):
-            hits.append(f"{file_path.name}:{line_no}: {line.strip()[:120]}")
-    return hits[:3]
+    return hits
 
 
 def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
@@ -351,14 +364,14 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
                 terms.append(entry)
         return terms[:5]
 
-    pattern = _LANG_TYPE_PATTERNS.get(suffix)
-    if not pattern:
+    compiled = _LANG_TYPE_REGEXES.get(suffix)
+    if not compiled:
         return []
     try:
         text = file_path.read_text(encoding="utf-8-sig", errors="replace")
     except OSError:
         return []
-    for match in re.finditer(pattern, text):
+    for match in compiled.finditer(text):
         name = match.group(1)
         if any(noun in name.lower() for noun in nouns):
             terms.append(name)
@@ -403,7 +416,9 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     adjacent_paths: set[str] = set()
     search_failed: list[str] = []
 
-    with ThreadPoolExecutor() as pool:  # default: min(32, os.cpu_count() + 4)
+    # Cap workers: phase 1 has len(all_terms) grep tasks + 1 doc task
+    _phase1_workers = min(32, len(all_terms) + 1)
+    with ThreadPoolExecutor(max_workers=_phase1_workers) as pool:
         # Submit in noun order; iterate results in the same order (not
         # completion order) so related_files is deterministic across runs.
         grep_futures = [
@@ -415,14 +430,13 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         ]
         doc_future = pool.submit(_find_doc_files, cwd)
 
-        match_counts: dict[str, int] = {}
+        match_counts: Counter[str] = Counter()
         for noun, fut in grep_futures:
             paths = fut.result()
             if paths is None:
                 search_failed.append(noun)
                 continue
-            for path_str in paths:
-                match_counts[path_str] = match_counts.get(path_str, 0) + 1
+            match_counts.update(paths)
         seen_paths = set(match_counts)
         ranked = sorted(match_counts, key=lambda p: -match_counts[p])
         result.related_files = [FileSignal(path=p) for p in ranked]
@@ -469,7 +483,9 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     result.analogous_features = sorted(adjacent_paths)[:_MAX_ANALOGOUS]
 
     # ── Phase 2: parallel git log + constraints + term extraction + test files ──
-    with ThreadPoolExecutor() as pool:  # default: min(32, os.cpu_count() + 4)
+    # Cap workers: phase 2 tasks are bounded by _MAX_FILES (5 files x 4 task types)
+    _phase2_workers = min(32, _MAX_FILES * 4)
+    with ThreadPoolExecutor(max_workers=_phase2_workers) as pool:
         log_futures = {
             pool.submit(_git_log, f.path, cwd): f for f in result.related_files
         }

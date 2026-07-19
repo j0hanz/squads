@@ -103,14 +103,14 @@ Before trusting a passing test:
 
 ## Red Flags — Stop Rationalizing, Delete and Restart
 
-Any of these signals means you have left TDD and the fix is the same every time. Do not argue the case; do not "adapt" what you wrote.
+Any of these means you've left TDD — the fix is the same every time. Don't argue; don't "adapt" what you wrote.
 
-- Implementation written before, or without, a failing test for the behavior it adds (a HARD GATE violation).
-- The test trivially passes without exercising the logic under test (e.g. asserts a constant the stub already returns, mocks the unit itself, or never calls the code path).
-- Tests retrofitted to match already-written code ("tests-after"), or a test edited to force a pass.
-- Self-talk: "too simple to test", "I already manually tested it", "tests after achieve the same purpose", "it's the spirit that matters, not the ritual", "this is different because...".
-- Skipping the N-1 check because "it obviously would fail" — a test you have not seen fail is testing nothing.
-- A GREEN that arrives on the first run with no RED observed for that specific behavior.
+- Implementation written before, or without, a failing test for the behavior it adds (HARD GATE violation).
+- The test trivially passes without exercising the logic under test (e.g. asserts a constant the stub returns, mocks the unit itself, or never calls the code path).
+- Tests retrofitted to already-written code ("tests-after"), or a test edited to force a pass.
+- Self-talk: "too simple to test", "I already manually tested it", "tests after achieve the same purpose", "it's the spirit that matters", "this is different because...".
+- Skipping the N-1 check because "it obviously would fail" — a test you haven't seen fail tests nothing.
+- A GREEN that arrives on the first run with no RED observed for that behavior.
 - Keeping code-first output "as reference" or "to adapt" instead of deleting it.
 
 **All of these mean:** delete the code-first implementation, re-enter the cycle at RED, and run the test to confirm it fails before re-implementing.

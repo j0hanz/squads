@@ -120,8 +120,8 @@ Any of these means you've left TDD — the fix is the same every time. Don't arg
 
 On full behavior-list coverage and a clean REFACTOR, run the full test suite one final time and report the results. If the final run fails: a failure in the behavior just built re-enters the cycle at RED; an unrelated new failure routes to `parallel-debugging`. Never report done over a failing suite.
 
-| Skill                                                  | Use Case                                                       |
-| :----------------------------------------------------- | :------------------------------------------------------------- |
-| [review](../review/SKILL.md)                           | Fresh-eye review of the completed diff                         |
-| [parallel-debugging](../parallel-debugging/SKILL.md)   | Stuck GREEN (Step 2 escalation) or unrelated final-run failure |
-| [plan](../plan/SKILL.md)                               | Design itself proved wrong mid-cycle                           |
+| Skill                                                | Use Case                                                       |
+| :--------------------------------------------------- | :------------------------------------------------------------- |
+| [review](../review/SKILL.md)                         | Fresh-eye review of the completed diff                         |
+| [parallel-debugging](../parallel-debugging/SKILL.md) | Stuck GREEN (Step 2 escalation) or unrelated final-run failure |
+| [plan](../plan/SKILL.md)                             | Design itself proved wrong mid-cycle                           |

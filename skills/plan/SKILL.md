@@ -150,6 +150,6 @@ Detail: [Specific requirement statement]
 ## Next Skills
 
 | Skill                                          | Use Case                                                                     |
-| :--------------------------------------------- | :-------------------------------------------------------------------------- |
-| [dispatch-agents](../dispatch-agents/SKILL.md) | Multi-task execution once APPROVED                                            |
+| :--------------------------------------------- | :--------------------------------------------------------------------------- |
+| [dispatch-agents](../dispatch-agents/SKILL.md) | Multi-task execution once APPROVED                                           |
 | [tdd](../tdd/SKILL.md)                         | Single focused task once APPROVED; or sketch-depth plan implemented directly |

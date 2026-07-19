@@ -100,8 +100,8 @@ HARD GATE applies (see Strict Rules): route root cause and repro; don't prescrib
 
 ## Next Skills
 
-| Skill                                                  | Use Case                                                                                                   |
-| :----------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- |
-| [tdd](../tdd/SKILL.md)                                 | Fix isolated logic bug — minimal repro (with verbatim output) is RED test                                  |
-| [plan](../plan/SKILL.md)                               | Design-level failure needing architecture/contract change                                                  |
-| [review](../review/SKILL.md)                           | Existing review feedback flagged design-level concern — resolve here, then [plan](../plan/SKILL.md) if re-draft needed |
+| Skill                        | Use Case                                                                                                               |
+| :--------------------------- | :--------------------------------------------------------------------------------------------------------------------- |
+| [tdd](../tdd/SKILL.md)       | Fix isolated logic bug — minimal repro (with verbatim output) is RED test                                              |
+| [plan](../plan/SKILL.md)     | Design-level failure needing architecture/contract change                                                              |
+| [review](../review/SKILL.md) | Existing review feedback flagged design-level concern — resolve here, then [plan](../plan/SKILL.md) if re-draft needed |

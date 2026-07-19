@@ -10,7 +10,7 @@ Autonomous TDD execution. **HARD GATE:** No implementation code WITHOUT a failin
 
 ## When NOT to use TDD
 
-Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS (and only that category); then skip TDD and state the reason in the structured return. Zero-logic boilerplate is not an autonomous escape hatch — if in doubt, write the test. Match the user's request to one of the escape-hatch categories below, then confirm via `AskUserQuestion`:
+Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS (and only that category); then skip TDD and state the reason in the [structured return](../dispatch-agents/SKILL.md#handoff-contract) (gist: "canonical return struct"). Zero-logic boilerplate is not an autonomous escape hatch — if in doubt, write the test. Match the user's request to one of the escape-hatch categories below, then confirm via `AskUserQuestion`:
 
 **Escape-hatch categories:**
 

@@ -62,9 +62,9 @@ Write merged result in Canonical Task Block Schema.
 
 ## Step 4: Write
 
-Save `docs/plan/<kebab-name>.specs.md` and `docs/plan/<kebab-name>.plan.md` with headers `Status: DRAFT` and `Depth: <sketch|contract|blueprint>` (Step 0 depth). All task entries use Canonical Task Block Schema. For `sketch`, main thread converts Step 2 plain-prose draft into schema here.
+Save `docs/plan/<kebab-name>.specs.md` and `docs/plan/<kebab-name>.plan.md` with headers `Status: DRAFT`, `Depth: <sketch|contract|blueprint>` (Step 0 depth), and `Origin: request-plan`. All task entries use Canonical Task Block Schema. For `sketch`, main thread converts Step 2 plain-prose draft into schema here.
 
-**Done when:** both files exist under `docs/plan/` with `Status: DRAFT` and `Depth:` headers and schema task entries.
+**Done when:** both files exist under `docs/plan/` with `Status: DRAFT`, `Depth:`, and `Origin: request-plan` headers, and schema task entries.
 
 ## Step 5: Verification
 

@@ -13,7 +13,7 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 - **Fill every `{{...}}` before dispatch:** no unresolved placeholder reaches the reviewer (dispatch-check enforces this).
 - **Verbatim handoff:** paste the reviewer's output to the user unchanged — never edit, correct, or translate it.
 - **No direct fixes on FAIL:** route to `receive-code-review`; don't patch findings here.
-- **2-pass re-review cap:** the cap depends on the `Review pass: N` line in the feedback — carry it forward to `receive-code-review`.
+- **2-pass re-review cap:** the cap depends on the [`Review pass: N`](../dispatch-agents/SKILL.md#handoff-contract) line in the feedback — carry it forward to `receive-code-review`.
 
 ## Steps
 
@@ -62,7 +62,7 @@ Check correctness, security, edge cases, and reuse/simplification, then reply st
 
 ### Step 3: Hand off
 
-1. **Verbatim output.** State `Review pass: N` (N = incoming re-review pass number, else 1), then paste subagent's output verbatim to user. Never edit, correct, or translate the review.
+1. **Verbatim output.** State `Review pass: N` (N = incoming re-review pass number, else 1), then paste subagent's output verbatim to user. Never edit, correct, or translate the review. Output maps to the canonical struct per [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) (gist: "canonical return struct + state rules"); when a plan file exists, main thread records `Review pass: N` in its header.
 2. On **PASS**: prompt "Changes are ready — commit and push / open a PR."
 3. **No direct fixes on FAIL.** On **FAIL**: invoke `receive-code-review` with the same `Review pass: N` line (its 2-pass cap depends on it). Don't patch findings here.
 4. **Done when:** verbatim review surfaced, PASS or FAIL route taken.

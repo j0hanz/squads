@@ -7,12 +7,17 @@ set -uo pipefail
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 skill_path="$script_dir/../skills/using-squads/SKILL.md"
 
+if ! command -v jq >/dev/null 2>&1; then
+  echo 'squads: WARNING — jq not found; dispatch-check and debug-gate guards are inactive this session. Fix: winget install jqlang.jq'
+  echo
+fi
+
 if [[ ! -f "$skill_path" ]]; then
   echo "Error reading squads router skill: $skill_path not found" >&2
   exit 0
 fi
 
-# Drop YAML frontmatter: a leading --- line through the next --- line.Do 1
+# Drop YAML frontmatter: a leading --- line through the next --- line.
 cleaned=$(awk '
   NR == 1 && /^---\r?$/ { in_fm = 1; next }
   in_fm { if (/^---\r?$/) in_fm = 0; next }

@@ -15,7 +15,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task|Agent",
+        "matcher": "Task|Agent|SendMessage",
         "hooks": [
           {
             "type": "command",
@@ -31,6 +31,17 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/debug-gate.sh\"",
             "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end.sh\"",
+            "timeout": 5
           }
         ]
       }

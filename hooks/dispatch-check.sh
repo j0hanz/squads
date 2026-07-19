@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# PreToolUse guard for subagent dispatch (Task/Agent tool). Four checks:
+# PreToolUse guard for subagent dispatch (Task/Agent/SendMessage tools). Four checks:
 #  1. unresolved {{...}} placeholders (request-code-review: "No unresolved
 #     placeholders reach subagent") — a reviewer handed a literal {{diff}}
 #     reviews nothing yet may still return a plausible PASS;
@@ -23,7 +23,7 @@ deny() {
 }
 
 input=$(cat)
-prompt=$(jq -r '.tool_input.prompt // empty' <<<"$input" 2>/dev/null) || exit 0
+prompt=$(jq -r '.tool_input.prompt // .tool_input.message // empty' <<<"$input" 2>/dev/null) || exit 0
 [[ -n "$prompt" ]] || exit 0
 
 # Instruction surface = prompt minus any <untrusted_context>...</untrusted_context>

@@ -1,19 +1,14 @@
 ---
 name: release-plugin
-description: Use when cutting a new version release for the squads Claude Code plugin — bumping the version, validating, tagging, and publishing a GitHub release.
-metadata:
-  category: technique
-  triggers: release, new release, version bump, cut a release, publish plugin, gh release, tag version
+description: Use when cutting a new version release for the squads Claude Code plugin — version bump, tag, or GitHub release.
 ---
 
 # Plugin Release
 
-Version-bump-and-ship workflow for **this repo only**. squads is a Claude Code
-plugin installed via `/plugin marketplace add`, not an npm package — don't
-import steps (npm publish, changelog script, Discord notify) from generic
-release skills written for npm-published projects. If new steps show up
-that this file doesn't cover, update this file rather than reinventing them
-ad hoc.
+Version-bump-and-ship workflow for **this repo only** — squads is a Claude Code
+plugin installed via `/plugin marketplace add j0hanz/squads`, not an npm
+package. If new steps show up that this file doesn't cover, update this file
+rather than reinventing them ad hoc.
 
 ## Files that carry the version (all 3, kept in sync)
 
@@ -26,7 +21,7 @@ ad hoc.
 ## Determine bump type
 
 ```bash
-git describe --tags --abbrev=0          # last release tag
+git describe --tags --abbrev=0          # last release tag (fails if no tags yet — then this is the first release; use all commits)
 git log <last-tag>..HEAD --oneline       # commits since then
 ```
 
@@ -42,7 +37,7 @@ git log <last-tag>..HEAD --oneline       # commits since then
    git grep -n "\"version\": \"<NEW>\"" -- package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json   # must print exactly 3 lines
    git grep -n "\"version\": \"<OLD>\"" -- package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json   # must print zero
    ```
-3. **Validate**: `npm run validate` (runs `claude plugin validate . --strict`) — must pass before committing.
+3. **Validate**: run exactly `claude plugin validate . --strict` — must pass before committing.
 4. **Commit** (stage only the 3 version files):
    ```bash
    git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json
@@ -54,21 +49,9 @@ git log <last-tag>..HEAD --oneline       # commits since then
 8. **Release**: `gh release create v<NEW> --title "v<NEW>" --notes "<notes>"`, notes summarizing the commits since `<last-tag>` grouped by fix/feat/etc.
 9. **Finalize**: `git status` must show a clean working tree.
 
-## Why the tag matters
-
-The README version badge (`shields.io/github/v/tag/j0hanz/squads`) reads
-the **git tag**, not `package.json`. Skipping the tag push leaves the badge
-stale even though the manifests are correct.
-
 ## Explicitly out of scope for this repo
 
-- `npm publish` — not npm-distributed; installed via `/plugin marketplace add j0hanz/squads`.
+- `npm publish` — not npm-distributed.
 - CHANGELOG.md / changelog-generation script — doesn't exist here.
 - Discord release notification — doesn't exist here.
 - `plugin/`, `.codex-plugin/`, `openclaw/` manifests — this repo doesn't have them; only the 3 files in the table above.
-
-## Common Mistakes
-
-- Pulling in npm-publish/changelog/Discord steps from another project's release skill — this repo has none of that infra.
-- Missing that `marketplace.json`'s version lives under `plugins[0]`, not the file root.
-- Pushing the tag without asking first.

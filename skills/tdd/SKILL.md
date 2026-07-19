@@ -23,9 +23,11 @@ Escape hatches from the HARD GATE. Never self-invoke one silently — confirm vi
 
 ## Autonomous invocation (approved-plan handoff)
 
-When invoked by `receive-plan` or `dispatch-agents` with a task from an APPROVED `docs/plan/<name>.plan.md`, skip Step 0 and the Pre-TDD `AskUserQuestion` gates — plan approval already locked scope and interface. Derive the interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:` fields, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
+When invoked by `receive-plan`/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `parallel-debugging` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
 
-When invoked by `parallel-debugging` with a minimal repro as the RED test, skip Step 0 and the Pre-TDD `AskUserQuestion` gates — the reproducing case and root-cause isolation are already locked. Derive the behavior under test from the repro and its verbatim failing output, state it in one line, and enter the TDD Cycle at RED. Skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure; run the repro test against the existing code and confirm RED. All other gates still apply unchanged.
+Per-origin delta:
+- **`receive-plan`/`dispatch-agents`:** derive interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:`.
+- **`parallel-debugging`:** derive the behavior under test from the repro and its verbatim failing output; skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure, so run the repro test against the existing code and confirm RED.
 
 ## Step 0: Confirm Scope
 
@@ -101,14 +103,14 @@ Before trusting a passing test:
 
 ## Red Flags — Stop Rationalizing, Delete and Restart
 
-Any of these signals means you have left TDD and the fix is the same every time. Do not argue the case; do not "adapt" what you wrote.
+Any of these means you've left TDD — the fix is the same every time. Don't argue; don't "adapt" what you wrote.
 
-- Implementation written before, or without, a failing test for the behavior it adds (a HARD GATE violation).
-- The test trivially passes without exercising the logic under test (e.g. asserts a constant the stub already returns, mocks the unit itself, or never calls the code path).
-- Tests retrofitted to match already-written code ("tests-after"), or a test edited to force a pass.
-- Self-talk: "too simple to test", "I already manually tested it", "tests after achieve the same purpose", "it's the spirit that matters, not the ritual", "this is different because...".
-- Skipping the N-1 check because "it obviously would fail" — a test you have not seen fail is testing nothing.
-- A GREEN that arrives on the first run with no RED observed for that specific behavior.
+- Implementation written before, or without, a failing test for the behavior it adds (HARD GATE violation).
+- The test trivially passes without exercising the logic under test (e.g. asserts a constant the stub returns, mocks the unit itself, or never calls the code path).
+- Tests retrofitted to already-written code ("tests-after"), or a test edited to force a pass.
+- Self-talk: "too simple to test", "I already manually tested it", "tests after achieve the same purpose", "it's the spirit that matters", "this is different because...".
+- Skipping the N-1 check because "it obviously would fail" — a test you haven't seen fail tests nothing.
+- A GREEN that arrives on the first run with no RED observed for that behavior.
 - Keeping code-first output "as reference" or "to adapt" instead of deleting it.
 
 **All of these mean:** delete the code-first implementation, re-enter the cycle at RED, and run the test to confirm it fails before re-implementing.

@@ -20,7 +20,7 @@ Route out instead of debugging:
 
 ## First: do you need a fleet?
 
-Single-thread reproduce, then isolate, handles most bugs. Fan out parallel hypothesis investigators (Step 2) when one holds:
+Single-thread reproduce-then-isolate handles most bugs. Fan out parallel hypothesis investigators (Step 2) when:
 
 - Multiple plausible hypotheses compete — including ones already named by report, stack trace, or caller graph (fan out immediately, don't single-thread highest-prior first).
 - Bug spans modules, several candidate causes could each explain it.
@@ -29,7 +29,7 @@ Single-thread justified only when stack trace's top frame IS root-cause line (wh
 
 ## Invariants — apply to every dispatch
 
-All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply verbatim — clean context, judge ≠ generator, criteria before dispatch, structured returns, reads-parallel/writes-serial, hub-and-spoke, untrusted external content, ~10-agent limit. Debugging-specific additions:
+All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply verbatim. Debugging-specific additions:
 
 - **No mocked investigators or skeptics.** Investigators and skeptics are distinct subagents dispatched via the Agent tool with isolated context — main thread never generates their findings or grades hypothesis it formed or read. In-thread "investigation" is a hypothesis, not finding; in-thread "refutation" is self-review, not verification.
 - **Bare-claim hypotheses to skeptics.** Hypothesis handed to skeptic is one-line claim — `root cause is <X> at <file:line>, classified as <logic|design-level>` — no reasoning, no evidence walkthrough, no caller/graph findings. Skeptic re-derives evidence from repro and verbatim output alone; smuggling investigator's reasoning into the hypothesis defeats judge ≠ generator while satisfying every literal rule.
@@ -61,7 +61,7 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 
 ## Step 3: Adversarial verify each hypothesis
 
-1. For each hypothesis, dispatch two+ fresh skeptics — one hypothesis per skeptic, blind to all other hypotheses (clean context) — batched in ONE message across all hypotheses, with distinct refutation angles (one attacks repro, one caller-graph, one classification). Each is a distinct subagent who never saw that investigator's reasoning, given only its one bare-claim hypothesis + repro + verbatim failing output (hypothesis truncated to the one-line form per Invariants before dispatch — no investigator reasoning pasted through) — prompted to _refute_ it: Does repro actually reproduce? Does proposed cause actually produce observed symptom (not neighboring one)? Sibling callers missed? Classification correct?
+1. For each hypothesis, dispatch two+ fresh skeptics — one hypothesis per skeptic, blind to the other hypotheses (clean context per Invariants) — batched in ONE message across all hypotheses, with distinct refutation angles (one attacks the repro, one the caller-graph, one the classification). Each is a distinct subagent who never saw that investigator's reasoning, given only its one bare-claim hypothesis + repro + verbatim failing output (truncated to the one-line form per Invariants before dispatch — no investigator reasoning pasted through), prompted to _refute_ it: Does the repro actually reproduce? Does the proposed cause actually produce the observed symptom (not a neighboring one)? Sibling callers missed? Classification correct?
 2. Hypothesis dies when majority of its skeptics refute it. Survivors advance with refutation-responses attached. Even split: dispatch one additional skeptic with distinct refutation angle, re-tally — hypothesis dies only when strict majority of its skeptics refute it.
 3. No hypothesis survives: don't route fix — re-enter Step 2 with new hypotheses derived from refutations, deduped against every hypothesis seen so far (including refuted ones) by `(file:line, classification)`. Stop after 2 consecutive rounds producing no new survivor, then escalate to user with refutation trail.
 

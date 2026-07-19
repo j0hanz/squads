@@ -6,6 +6,15 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 
 # request-code-review
 
+## Strict Rules
+
+- **No review of a failing diff:** run covering tests first; any failure → abort, report — never dispatch review of a failing diff.
+- **Read-only, fresh context:** one subagent, write/edit tools denied — never review your own diff in-thread.
+- **Fill every `{{...}}` before dispatch:** no unresolved placeholder reaches the reviewer (dispatch-check enforces this).
+- **Verbatim handoff:** paste the reviewer's output to the user unchanged — never edit, correct, or translate it.
+- **No direct fixes on FAIL:** route to `receive-code-review`; don't patch findings here.
+- **2-pass re-review cap:** the cap depends on the `Review pass: N` line in the feedback — carry it forward to `receive-code-review`.
+
 ## Steps
 
 ### Step 1: Verify prerequisites

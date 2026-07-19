@@ -74,21 +74,33 @@ Canonical role→model tier map for dispatched subagents. One swap-point when mo
 
 ## Executing an approved plan
 
-When [receive-plan](../receive-plan/SKILL.md) hands off an APPROVED `docs/plan/<name>.plan.md`, its [Canonical Task Block Schema](../request-plan/SKILL.md#canonical-task-block-schema) fields drive dispatch — never improvise execution order:
+When [receive-plan](../receive-plan/SKILL.md) hands off an APPROVED `docs/plan/<name>.plan.md`, its [Canonical Task Block Schema](../request-plan/SKILL.md#canonical-task-block-schema) fields drive dispatch — never improvise order:
 
-- **`Depends on:` sets order.** Dispatch task only after everything it depends on completed, validated; tasks with no dependency path between them may run parallel.
-- **`Files:` decides parallel vs. serial.** Overlapping file lists → serial (or isolated worktrees). Disjoint lists → parallel safe. Reads-parallel/writes-serial invariant applied per task.
-- **`Validate:` is structured return.** Each worker runs task's `Validate:` command, reports exit code, output — task without passing validation isn't done. On pass, terse form: `STATUS: PASS — Validate: <cmd> exit 0; files: <list>`. On fail or partial: full structured return with `file:line` findings (see Invariants). Failed `Validate:` from impl bug (not plan error) routes to `parallel-debugging`, reproduce/isolate root cause before re-fixing; genuinely wrong plan routes to `request-plan`.
-- **`Satisfies:` goes into worker's spec.** Worker gets the REQ-NNN IDs from the task and the corresponding REQ text blocks pulled from `specs.md` — knows acceptance criterion, not just action.
+- **`Depends on:` sets order.** Dispatch a task only after its dependencies complete and validate; tasks with no path between them may run parallel.
+- **`Files:` decides parallel vs. serial.** Overlapping lists → serial (or isolated worktrees); disjoint → parallel safe. Reads-parallel/writes-serial, per task.
+- **`Validate:` is the structured return.** Each worker runs the task's `Validate:` command and reports exit code + output — a task that doesn't pass isn't done. Pass: `STATUS: PASS — Validate: <cmd> exit 0; files: <list>`. Fail/partial: full structured return with `file:line` findings (see Invariants). A failed `Validate:` from an impl bug (not a plan error) routes to `parallel-debugging` — reproduce/isolate the root cause before re-fixing; a genuinely wrong plan routes to `request-plan`.
+- **`Satisfies:` goes into the worker's spec.** Worker gets the REQ-NNN IDs and matching REQ text blocks from `specs.md` — knows the acceptance criterion, not just the action.
 
-**Done when:** every task in plan dispatched in dependency order, returned passing `Validate:` exit code, or failing task routed to `parallel-debugging` (impl bug) / `request-plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint, no separate run file.
+**Done when:** every task dispatched in dependency order returns a passing `Validate:` exit code, or a failing task routes to `parallel-debugging` (impl bug) / `request-plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint — no separate run file.
 
 ## Long-running builds
 
-For multi-milestone implementation work, use three roles:
+For multi-milestone work, three roles:
 
-1. **Orchestrator** plans: features, milestones, validation contract — concrete assertions defining correctness, written before any code exists.
-2. **Workers** implement per file overlap (reads-parallel/writes-serial, per the invariants): overlap → serial, one at a time, each committing so next inherits clean state; disjoint → parallel, each in its own `git worktree` (main thread creates worktrees, dispatches in one message, merges branches back serially).
-3. **Validators** — who never saw code — check each milestone twice: static scrutiny (tests, types, lint, review) and behavior (actually exercise running thing end-to-end).
+1. **Orchestrator** plans features, milestones, and the validation contract — concrete correctness assertions written before any code exists.
+2. **Workers** implement per file overlap (reads-parallel/writes-serial): overlap → serial, one at a time, each committing so the next inherits clean state; disjoint → parallel, each in its own `git worktree` (main thread creates worktrees, dispatches in one message, merges branches back serially).
+3. **Validators** — who never saw the code — check each milestone twice: static scrutiny (tests, types, lint, review) and behavior (actually exercise the running thing end-to-end).
 
-**Done when:** each milestone passes both static and behavior validation; failing milestone routes to parallel-debugging (impl bug) or request-plan (plan error).
+**Done when:** each milestone passes both static and behavior validation; a failing milestone routes to parallel-debugging (impl bug) or request-plan (plan error).
+
+## Next Skills
+
+| Skill                                                  | Use Case                                                                  |
+| :----------------------------------------------------- | :------------------------------------------------------------------------ |
+| [parallel-brainstorming](../parallel-brainstorming/SKILL.md) | Vague requirements, open solution space, ≥2 architectural approaches |
+| [request-plan](../request-plan/SKILL.md)               | Clear feature or change needing a plan or spec                          |
+| [receive-plan](../receive-plan/SKILL.md)               | Validate an existing plan/specs pair (contract/blueprint)              |
+| [tdd](../tdd/SKILL.md)                                 | Single new logic behavior, or a TDD red flag                            |
+| [parallel-debugging](../parallel-debugging/SKILL.md)   | Test, `Validate:`, or runtime fail unexpectedly — before any fix        |
+| [request-code-review](../request-code-review/SKILL.md) | Verified diff awaiting a fresh-eye review                             |
+| [receive-code-review](../receive-code-review/SKILL.md) | Resolve review feedback (human, bot, or subagent)                       |

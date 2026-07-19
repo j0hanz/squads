@@ -6,12 +6,11 @@ argument-hint: '[feature request or problem to explore]'
 
 # parallel-brainstorming
 
-<HARD-GATE>
-Don't propose code, file change, or concrete implementation plan for new feature or ambiguous request until Phase 6 produce Design Brief for approach user lock in Phase 4 (and, if Phase 5 ran, Phase 5 mark `APPROVED`). Sketch approach in doc still design work — need Phase 1 Discovery first. Not apply to bug fix, typo, one-line config change with no design space.
-Unsure if request bug fix or feature? Treat as design work, run Phase 1 — bug-fix exemption must not skip Discovery.
-</HARD-GATE>
+**HARD GATE:** Don't propose code, a file change, or a concrete implementation plan for a new feature or ambiguous request until Phase 6 produces a Design Brief for the approach locked in Phase 4 (and Phase 5 marks `APPROVED` if it ran). A sketch in a doc is still design work — Phase 1 Discovery comes first. Doesn't apply to a bug fix, typo, or one-line config change with no design space. Unsure if the request is a bug fix or a feature? Treat it as design work, run Phase 1 — the bug-fix exemption must not skip Discovery.
 
 ## Process Flow
+
+This skill uses `Phase 1-6`, not the linear `Step 0-5` of the execution skills — phases, not steps, because ideation is a cyclic loop (checkpoint + REVISE loop-back) rather than a one-way path.
 
 1 → (2 if ambiguous) → Creative Checkpoint → 3 → 4 → (5 if flagged: APPROVED → 6, REVISE → loop in 5, REJECT → 3 or stop) → 6
 

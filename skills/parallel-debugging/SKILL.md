@@ -29,7 +29,7 @@ Single-thread justified only when stack trace's top frame IS root-cause line (wh
 
 ## Invariants — apply to every dispatch
 
-All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply verbatim — clean context, judge ≠ generator, criteria before dispatch, structured returns, reads-parallel/writes-serial, hub-and-spoke, untrusted external content, ~10-agent limit. Debugging-specific additions:
+All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply verbatim. Debugging-specific additions:
 
 - **No mocked investigators or skeptics.** Investigators and skeptics are distinct subagents dispatched via the Agent tool with isolated context — main thread never generates their findings or grades hypothesis it formed or read. In-thread "investigation" is a hypothesis, not finding; in-thread "refutation" is self-review, not verification.
 - **Bare-claim hypotheses to skeptics.** Hypothesis handed to skeptic is one-line claim — `root cause is <X> at <file:line>, classified as <logic|design-level>` — no reasoning, no evidence walkthrough, no caller/graph findings. Skeptic re-derives evidence from repro and verbatim output alone; smuggling investigator's reasoning into the hypothesis defeats judge ≠ generator while satisfying every literal rule.

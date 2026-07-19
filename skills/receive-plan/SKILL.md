@@ -1,6 +1,6 @@
 ---
 name: receive-plan
-description: Use when a plan/specs pair exists and needs validation before execution. Not for sketch-depth plans.
+description: Use when a plan/specs pair exists and needs validation before execution. Prefer over request-plan when validating an existing pair rather than fresh drafting. Not for sketch-depth plans.
 argument-hint: '[--depth contract|blueprint] <plan-path> <specs-path>'
 ---
 
@@ -22,7 +22,7 @@ Wrap non-session-originated plan content in `<untrusted_context>` before passing
 
 Main thread runs grep/file-read directly — no subagent, no shell. Verify all below; any violation = itemized failure:
 
-- Plan header's `Depth:` (falling back to `--depth` argument, else `blueprint` — fallback intentionally stricter than request-plan's `contract` default: a missing header gets the heavier check) is `contract` or `blueprint` — `Depth: sketch` rejected immediately (NO Sketch Plans).
+- Plan header's `Depth:` (or `--depth` arg, else `blueprint`) is `contract` or `blueprint` — `Depth: sketch` rejected immediately (NO Sketch Plans).
 - Every `Satisfies:` token is a `REQ-NNN` ID declared in specs.md, resolves to it — unknown prefixes (e.g. `PERF-xxx`, `NFR-xxx`) or undefined IDs = itemized failures.
 - Every `Depends on: TASK-NNN` resolves to real task; dependency graph acyclic.
 - Every Task Block has all 7 required fields (see [Canonical Task Block Schema](../request-plan/SKILL.md#canonical-task-block-schema)).
@@ -34,7 +34,7 @@ Report `N_passed / N_total` per category. Any `N_passed < N_total` → REVISE wi
 
 ## Step 3: Critic Fan-out (blueprint) or Single Critic (contract)
 
-Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer drafting context — judge ≠ generator; plan + specs are the artifact judged, passed clean.
+Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer drafting context — judge ≠ generator.
 
 - **`contract`** — 1 critic, all three lenses in single pass, lighter check focused on scope boundaries and dependency cycles. Lens rubrics below still apply; one agent holds all three.
 - **`blueprint`** — 3 critics dispatched in ONE message, one per lens, blind to each other (hub-and-spoke):

@@ -6,15 +6,6 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 
 # request-code-review
 
-## Strict Rules
-
-- **Fresh context only.** Never review own diff in-thread. Always dispatch subagent.
-- **Read-only reviewer.** Deny write/edit tools in subagent invocation. Reads, never mutates.
-- **Verbatim output.** Never edit, correct, translate review. Paste as-is.
-- **No direct fixes on FAIL.** Route FAIL to `receive-code-review`. Don't patch here.
-- **No unresolved placeholders reach subagent.** Replace every `{{...}}` in dispatch prompt with real values before dispatching.
-- **No working-tree mutation to force clean.** Never `stash`/`checkout`/`reset`. If tree dirty in committed mode, abort and report.
-
 ## Steps
 
 ### Step 1: Verify prerequisites
@@ -25,7 +16,7 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
      1. **Classify target → `head`.** `git rev-parse --verify <target>` succeeds → branch/commit (`head=<target>`); else path (`head=HEAD`, append `-- <target>` to diff in step 5); no target passed → use uncommitted mode instead.
      2. **Resolve default branch → `$def`.** Source `${CLAUDE_PLUGIN_ROOT}/skills/request-code-review/scripts/resolve-base.sh`; the script loops over the standard candidates and exports `DEF`. `$def` doesn't verify → abort, report "could not resolve default branch — pass explicit base".
      3. **Compute `base`.** `base = git merge-base "$def" "$head"` (or given base).
-     4. **Clean-tree check.** Run `git status --porcelain`; dirty → abort, report — committed mode needs clean tree, reviewer may Read working-tree files for context.
+     4. **No working-tree mutation to force clean.** Run `git status --porcelain`; dirty → abort, report — never `stash`/`checkout`/`reset` to force clean. Committed mode needs clean tree; reviewer may Read working-tree files for context.
      5. **Capture diff.** `git diff "$base".."$head"` (append `-- <path>` if path given in step 1).
    - **Uncommitted** (target is working tree): capture `git diff` plus `git diff --staged` as diff text block.
 3. Guard against empty diff:
@@ -35,7 +26,7 @@ argument-hint: '[target: branch, commit, or path — omit to review the uncommit
 
 ### Step 2: Dispatch reviewer
 
-1. Fill dispatch prompt below, dispatch one subagent, write/edit tools denied. `{{plan_summary}}` = one-two sentences stating change's intent, taken from plan task or commit message(s) in `"$base".."$head"`; neither exists → derive from diff before dispatching. `{{diff}}` = diff captured Step 1.
+1. **Read-only, fresh context.** Dispatch one subagent, write/edit tools denied — never review own diff in-thread. Fill every `{{...}}` before dispatch. `{{plan_summary}}` = one or two sentences stating change's intent, taken from plan task or commit message(s) in `"$base".."$head"`; neither exists → derive from diff before dispatching. `{{diff}}` = diff captured Step 1.
 2. Subagent must return these headers exactly: `## Code Review Result`, `**Status**: PASS|FAIL`, `### Blocking Issues`, `### Advisory Issues`, `### What Was Checked`.
 3. Header missing or malformed → retry once with reminder; second failure aborts review.
 4. **Done when:** subagent returns well-formed output, all required headers.
@@ -62,9 +53,9 @@ Check correctness, security, edge cases, and reuse/simplification, then reply st
 
 ### Step 3: Hand off
 
-1. State `Review pass: N` (N = incoming re-review pass number, else 1), then paste subagent's output verbatim to user.
+1. **Verbatim output.** State `Review pass: N` (N = incoming re-review pass number, else 1), then paste subagent's output verbatim to user. Never edit, correct, or translate the review.
 2. On **PASS**: prompt "Changes are ready — commit and push / open a PR."
-3. On **FAIL**: invoke `receive-code-review` with the same `Review pass: N` line (its 2-pass cap depends on it). Don't fix findings directly.
+3. **No direct fixes on FAIL.** On **FAIL**: invoke `receive-code-review` with the same `Review pass: N` line (its 2-pass cap depends on it). Don't patch findings here.
 4. **Done when:** verbatim review surfaced, PASS or FAIL route taken.
 
 ## Next Skills

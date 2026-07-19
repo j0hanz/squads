@@ -1,6 +1,6 @@
 ---
 name: request-plan
-description: Use when a new feature or change requires a plan or specification. Not when the solution space is open or two or more distinct architectural approaches are in play — use parallel-brainstorming first.
+description: Use when the user asks for a plan, spec, or design doc for a named feature or change. Not when two or more architectural approaches are in play — use parallel-brainstorming first. For validating an existing plan/specs pair, use receive-plan.
 argument-hint: '[--depth sketch|contract|blueprint] <feature description>'
 ---
 
@@ -112,7 +112,7 @@ Detail: [Specific requirement statement]
 - **NO Re-Scan**: pass Context Report to ideators; must not run own discovery.
 - **NO Cross-Talk**: ideators must never see each other's proposals.
 - **NO Mocked Ideators**: ideators must be distinct subagents; main thread can't generate them itself.
-- **NO Shell Execution** during discovery, drafting, or synthesis, except `scripts/scan_context.py` for codebase scanning (the same exemption `parallel-brainstorming` uses in Phase 1).
+- **NO Shell Execution** during discovery, drafting, or synthesis, except `${CLAUDE_PLUGIN_ROOT}/skills/parallel-brainstorming/scripts/scan_context.py` for codebase scanning.
 - **NO Schema at Draft Stage**: ideators write lightweight proposals; schema synthesis-only.
 
 ## Next Skills

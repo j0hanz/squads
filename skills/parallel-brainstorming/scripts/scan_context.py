@@ -61,6 +61,7 @@ _MAX_INTERFACE_SHAPES = (
 )
 _MAX_UNKNOWNS = 4  # 4: one per batch; clarifications are capped at 4 per batch
 _MAX_DESIGN_DOCS = 3  # 3: docs rarely add signal beyond the top 3
+_MAX_FILES = 5  # 5: top-N related files kept in the report; higher ranks win
 
 _DOC_GLOBS = [
     "glossary.md",
@@ -269,8 +270,7 @@ def _find_doc_files(cwd: Path) -> list[str]:
                 if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, "*/" + g):
                     buckets[i].append((rel_root / name).as_posix())
                     break
-    found = [p for bucket in buckets for p in bucket]
-    return found[:5]  # 5: matches the original cap
+    return [p for bucket in buckets for p in bucket]
 
 
 def _find_test_file(file_path: Path, cwd: Path) -> str:
@@ -446,10 +446,10 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         if len(Path(f.path).parts) > 1
     }
 
-    # Cap to 5 most relevant files
+    # Cap to _MAX_FILES most relevant files
     result.related_files = result.related_files[
-        :5
-    ]  # 5: keep the highest-ranked files (_MAX_FILES)
+        :_MAX_FILES
+    ]  # keep the highest-ranked files
 
     # Record analogous features (files found only via adjacent synonyms)
     result.analogous_features = sorted(adjacent_paths)[

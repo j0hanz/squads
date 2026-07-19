@@ -94,7 +94,6 @@ HARD GATE applies (see Strict Rules): route root cause and repro; don't prescrib
 - **Reproduction shown, not asserted:** quote command and verbatim failure output.
 - **No symptom patches:** fix root cause where all failing paths route through — check caller graph first.
 - **No guessing on non-repro:** escalate for repro; don't edit or suggest edits while blocked.
-- **No in-thread fixes:** any code Edit or prescribed fix text before sibling skill invoked is HARD GATE violation — including edits framed as investigator work, repro confirmation, or exploration. Hand fix to `tdd` (logic) or `request-plan` (design-level).
 - **Default to logic bug on ambiguity:** design-level call must name wrong contract.
 
 ## Next Skills

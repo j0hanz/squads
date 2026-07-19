@@ -8,7 +8,7 @@ argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 
 ## Step 0: Triage — invoked first, before any other skill
 
-Every incoming task/request start here. Classify it (first match win), route to workflow, decide fleet shape — never start building, planning, fixing before triage.
+Every incoming task/request starts here. Classify it (first match win), route to workflow, decide fleet shape — never start building, planning, fixing before triage.
 
 | Incoming request                                                                     | Workflow                                                                            | Fleet decision                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -21,12 +21,12 @@ Every incoming task/request start here. Classify it (first match win), route to 
 | Review feedback (human, bot, or subagent) to resolve                                 | [receive-code-review](../receive-code-review/SKILL.md)                              | Main thread verify findings; re-review capped at 2                                                                                                                                                                                                                 |
 | Bulk independent items, whole-repo audit, or unbiased judging of this context's work | Patterns (below)                                                                    | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                             |
 
-Two rows fit? Earlier wins: ideation before planning, planning before execution, bug before its fix. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiply token cost.
+Two rows fit? Earlier wins: ideation before planning, planning before execution, bug before its fix. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiplies token cost.
 
 ## Invariants — apply to every dispatch
 
-- **Clean context per agent.** Agent get spec, nothing else; never leak accumulated conversation.
-- **Judge ≠ generator.** Context that produced work never grades it — self-preference bias rig review. Verifiers distinct subagents, isolated context, never saw work built; in-thread "verification" is self-review, not verification.
+- **Clean context per agent.** Agents get spec, nothing else; never leak accumulated conversation.
+- **Judge ≠ generator.** Context that produced work never grades it — self-preference bias rigs review. Verifiers distinct subagents, isolated context, never saw work built; in-thread "verification" is self-review, not verification.
 - **Bare-claim to skeptic.** Hand verifier finding as one-line claim, not reasoning behind it — smuggling generator's reasoning into claim defeats judge ≠ generator while satisfying every literal rule.
 - **Criteria before dispatch.** Write rubric, checklist, or acceptance criteria _before_ agents run. Checks written after only confirm decisions already made.
 - **Structured returns, never "done."** Each agent return data: what completed, what didn't, findings with exact source (`file:line`, path, URL), commands run with exit codes. Untraceable claims discarded, not trusted.
@@ -52,7 +52,25 @@ Exploring _design approaches_ isn't Generate & filter job — [parallel-brainsto
 
 Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
 
-Match model to role per [model-tier reference](references/model-tier.md).
+### Model tier
+
+Canonical role→model tier map for dispatched subagents. One swap-point when model pricing/availability shift. Guidance, not config: where Agent tool expose `model` param, set per table — cheap → `haiku`, strong → `sonnet`, strongest → `opus`, tier unknown → omit param (inherit); where not exposed, encode tier as prompt instruction ("think carefully, verify before answering" for strong/strongest; "quick best-effort, one pass" for cheap).
+
+| Role                                   | Tier      | Why                                                                |
+| -------------------------------------- | --------- | ------------------------------------------------------------------ |
+| Ideator (request-plan)                 | cheap     | Divergent breadth; main thread merges — misses caught downstream   |
+| Investigator (parallel-debugging)      | cheap     | Read-only root-cause hunt; volume scales with hypothesis count     |
+| Classifier (classify & act)            | cheap     | Mechanical one-label-per-item routing                              |
+| Synthesizer (request-plan blueprint)   | strong    | Reconciles competing proposals; judgment over taste                |
+| Skeptic (parallel-debugging)           | strong    | Refutation needs care; cheap skeptic misses flaw it should find    |
+| Critic (receive-plan)                  | strong    | 3-lens spec review; miss cascades into rework                      |
+| Reviewer (request-code-review)         | strong    | Fresh-eye correctness/security; weak reviewer ships bugs           |
+| Worker (long-running builds)           | strong    | Implements; cheap produces diffs need costly rework                |
+| Orchestrator (long-running builds)     | strong    | Plans milestones; weak plan cascades into bad execution            |
+| Validator (long-running builds)        | strongest | Static+behavior check on shipped milestone; last gate before merge |
+| Judge (tournament / generate & filter) | strongest | Final selection; bias/disappointment cost highest                  |
+
+**Default when tier unknown:** inherit. Don't block dispatch on tier doubt — dispatched subagent at wrong tier beats no subagent.
 
 ## Executing an approved plan
 
@@ -73,11 +91,4 @@ For multi-milestone implementation work, use three roles:
 2. **Workers** implement per file overlap (reads-parallel/writes-serial, per the invariants): overlap → serial, one at a time, each committing so next inherits clean state; disjoint → parallel, each in its own `git worktree` (main thread creates worktrees, dispatches in one message, merges branches back serially).
 3. **Validators** — who never saw code — check each milestone twice: static scrutiny (tests, types, lint, review) and behavior (actually exercise running thing end-to-end).
 
-## Next Skills
-
-| Skill                                                  | Use Case                                                                    |
-| :----------------------------------------------------- | :-------------------------------------------------------------------------- |
-| [request-code-review](../request-code-review/SKILL.md) | Fresh-eye review once build/milestone completes                             |
-| [tdd](../tdd/SKILL.md)                                 | Delegate single logic-heavy task via RED-GREEN-REFACTOR                     |
-| [parallel-debugging](../parallel-debugging/SKILL.md)   | Task's `Validate:` fails unexpectedly — reproduce, isolate before re-fixing |
-| [request-plan](../request-plan/SKILL.md)               | Plan proved wrong mid-execution — re-draft before continuing                |
+**Done when:** each milestone passes both static and behavior validation; failing milestone routes to parallel-debugging (impl bug) or request-plan (plan error).

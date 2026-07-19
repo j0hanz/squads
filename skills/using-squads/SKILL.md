@@ -7,4 +7,4 @@ disable-model-invocation: true
 
 # using-squads
 
-Route every incoming task or user request to [dispatch-agents](../dispatch-agents/SKILL.md) for triage and workflow selection. Its Step 0 Triage classifies the request (first match wins) and picks the workflow + fleet shape. Skip only for pure conversation or a one-shot edit answerable direct.
+Route every incoming task or user request to [dispatch-agents](../dispatch-agents/SKILL.md); its Step 0 Triage classifies the request (first match wins) and picks the workflow + fleet shape. Skip only for pure conversation or a one-shot edit answerable direct.

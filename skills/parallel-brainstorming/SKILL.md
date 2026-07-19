@@ -42,13 +42,13 @@ Unsure if request bug fix or feature? Treat as design work, run Phase 1 — bug-
 ## Creative Checkpoint (Pre-Ideation)
 
 - **Evaluate:** Look for 10x simpler or zero-code solution.
-- **Seed:** Found? Use as "Approach A" (Minimalist lane) in Phase 3.
+- **Seed:** Found? Use as "Approach A" (Minimalist lens) in Phase 3.
 
 **Done when:** 10x/zero-code candidate seeded as Approach A, or confirm none exist, proceed to Phase 3 unseeded.
 
-## Phase 3: Multi-Lane Divergent Ideation
+## Phase 3: Multi-lens Divergent Ideation
 
-- **Single-Shot Generation:** Generate 2-3 distinct approach in one response. Always include Minimalist lens — seed Approach A in Phase 4; pick 1-2 more lens from list.
+- **Single-Shot Generation:** Generate 2-3 distinct approach in one response. Always include the Minimalist lens as Approach A (seeded by the Creative Checkpoint); pick 1-2 more lenses from the list.
 - **Context:** Use feature description + Context Report, inform all perspective.
 - **Lenses (assign one per approach):**
 
@@ -64,7 +64,7 @@ Unsure if request bug fix or feature? Treat as design work, run Phase 1 — bug-
 
 ## Phase 4: Convergence & Synthesis
 
-- **Synthesize:** Group similar idea. Combine strong mechanism with risk-mitigation from other lane.
+- **Synthesize:** Group similar idea. Combine strong mechanism with risk-mitigation from other lens.
 - **Distill:** Present 2-3 distinct approach. Approach A must be Minimalist. Each: What, Gains, Costs, Fit, First Step.
 - **Approval Lock:** Present 2-3 distilled approach to user via `AskUserQuestion`, lock one — hard-to-reverse decision committing Phase 6's Design Brief. **Await decision. Don't guess.**
 - **Routing:** Phase 5 flag set → Phase 5. Else → Phase 6.
@@ -102,7 +102,7 @@ Request: "add a way for users to save and re-run searches."
 
 1. **Phase 1:** Scan find existing `Filter` model, one-off "recent searches" list in `localStorage`. Scope: M. No flag (not high-risk, not L/XL).
 2. **Creative Checkpoint:** Minimalist seed found — extend `Filter` with `name` + `saved: boolean` column instead of new table.
-3. **Phase 3 (Multi-lane generation):** Conventional — new `SavedSearch` table + CRUD API, mirror `Bookmark`. Minimalist — reuse `Filter` + 2 column, no new endpoint (piggyback existing filter-list endpoint). Constraint-First — same as Minimalist, add per-user cap (20 saved searches) bound query cost.
+3. **Phase 3 (Multi-lens generation):** Conventional — new `SavedSearch` table + CRUD API, mirror `Bookmark`. Minimalist — reuse `Filter` + 2 column, no new endpoint (piggyback existing filter-list endpoint). Constraint-First — same as Minimalist, add per-user cap (20 saved searches) bound query cost.
 4. **Phase 4:** Synthesize 2 approach — Approach A (Minimalist + cap, cheapest), Approach B (Conventional, more flexible, new table + endpoint). User pick A. Not flagged → skip Phase 5.
 5. **Phase 6:** Design Brief written to `docs/design/2026-06-29-saved-searches-design.md`: Approach (extend `Filter`), Why (reuse existing model, smallest diff), Scope (M), Constraints (cap 20/user), Interface (`Filter.saved`, `Filter.name`), Architecture (no new table), Risks (cap need migration default), First Step (`ALTER TABLE filters ADD COLUMN saved boolean DEFAULT false`).
 6. Commit Guard: user decline auto-commit → brief left in chat + on disk; handoff to `request-plan` formalize task.
@@ -110,8 +110,6 @@ Request: "add a way for users to save and re-run searches."
 ## Strict Rules
 
 - **No Blended Ideation:** Keep Phase 3 perspective distinct; don't bleed into each other till Phase 4 synthesis.
-- **Never Ship Raw Ideas:** Phase 4 synthesis mandatory. Never present raw brainstormed idea as final answer.
-- **No Empty Rejections:** Require technical reason for any rejected High-severity issue during Phase 5 critique.
 - **No Agent-tool subagents for Phase 3 or 5.**
 
 ## Next Skills

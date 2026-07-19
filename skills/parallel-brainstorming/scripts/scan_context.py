@@ -130,6 +130,14 @@ _LANG_TYPE_REGEXES: dict[str, re.Pattern[str]] = {
     ext: re.compile(pat) for ext, pat in _LANG_TYPE_PATTERNS.items()
 }
 
+# Regex for exported function names in TypeScript/TSX files.
+# Matches: export function foo, export async function foo,
+#          export const foo = (, export const foo: Type = (
+_TS_EXPORT_FN_PATTERN: re.Pattern[str] = re.compile(
+    r"^export\s+(?:async\s+)?(?:function\s+(\w+)|const\s+(\w+)\s*(?::[^=]+)?\s*=\s*(?:async\s+)?\()",
+    re.MULTILINE,
+)
+
 
 def _dedupe_stable(items: Iterable[str]) -> list[str]:
     """Deduplicate preserving first-occurrence order."""
@@ -175,12 +183,46 @@ def _sanitize_noun(raw: str) -> str:
     return cleaned
 
 
-def _expand_synonyms(nouns: list[str]) -> list[str]:
-    """Return adjacent synonyms for well-known domain terms (deduped, originals first)."""
+def _load_project_synonyms(cwd: Path) -> dict[str, list[str]]:
+    """Load project-specific synonyms from `<cwd>/synonyms.json` if present.
+
+    The file must be a JSON object mapping lowercase noun strings to lists of
+    lowercase synonym strings. Extra keys are merged with `_SYNONYM_MAP`;
+    conflicting keys extend (not replace) the built-in synonym list.
+    Missing file or any parse error returns an empty dict (silent degradation).
+    """
+    path = cwd / "synonyms.json"
+    if not path.exists():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except OSError, json.JSONDecodeError:
+        return {}
+    if not isinstance(raw, dict):
+        return {}
+    result: dict[str, list[str]] = {}
+    for key, value in raw.items():
+        if isinstance(key, str) and isinstance(value, list):
+            clean_syns = [s for s in value if isinstance(s, str)]
+            if clean_syns:
+                result[key.lower()] = clean_syns
+    return result
+
+
+def _expand_synonyms(
+    nouns: list[str],
+    synonym_map: dict[str, list[str]] | None = None,
+) -> list[str]:
+    """Return adjacent synonyms for domain terms (deduped, originals first).
+
+    Uses `synonym_map` if provided, falling back to the built-in `_SYNONYM_MAP`.
+    """
+    if synonym_map is None:
+        synonym_map = _SYNONYM_MAP
     expanded = list(nouns)
     seen = {n.lower() for n in nouns}
     for noun in nouns:
-        for synonym in _SYNONYM_MAP.get(noun.lower(), []):
+        for synonym in synonym_map.get(noun.lower(), []):
             if synonym not in seen:
                 seen.add(synonym)
                 expanded.append(synonym)
@@ -304,17 +346,12 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
     suffix = file_path.suffix
     parent = file_path.parent
 
+    # Check fixed sibling candidates first (fastest, no walk needed)
     candidates = [
         parent / f"test_{stem}{suffix}",
         parent / f"{stem}_test{suffix}",
         parent / f"{stem}.test{suffix}",
         parent / f"{stem}.spec{suffix}",
-        cwd / "tests" / f"test_{stem}{suffix}",
-        cwd / "test" / f"test_{stem}{suffix}",
-        cwd / "__tests__" / f"{stem}.test{suffix}",
-        cwd / "__tests__" / f"{stem}.spec{suffix}",
-        cwd / "spec" / f"{stem}_spec{suffix}",
-        cwd / "spec" / f"{stem}.spec{suffix}",
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -322,6 +359,28 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
                 return candidate.relative_to(cwd).as_posix()
             except ValueError:
                 return candidate.as_posix()
+
+    # Walk known test roots for nested layouts (e.g. tests/unit/test_foo.py)
+    _test_root_names = ("tests", "test", "__tests__", "spec")
+    _test_name_patterns = (
+        f"test_{stem}{suffix}",
+        f"{stem}_test{suffix}",
+        f"{stem}.test{suffix}",
+        f"{stem}.spec{suffix}",
+        f"{stem}_spec{suffix}",
+    )
+    for root_name in _test_root_names:
+        test_root = cwd / root_name
+        if not test_root.is_dir():
+            continue
+        for dirpath, _, filenames in os.walk(test_root):
+            for pattern in _test_name_patterns:
+                if pattern in filenames:
+                    found = Path(dirpath) / pattern
+                    try:
+                        return found.relative_to(cwd).as_posix()
+                    except ValueError:
+                        return found.as_posix()
     return ""
 
 
@@ -333,9 +392,7 @@ def _scan_constraints(file_path: Path) -> list[str]:
             for line_no, line in enumerate(fh, 1):
                 ll = line.lower()
                 if any(pat in ll for pat in _CONSTRAINT_PATTERNS_LOWER):
-                    hits.append(
-                        f"{file_path.name}:{line_no}: {line.strip()[:120]}"
-                    )
+                    hits.append(f"{file_path}:{line_no}: {line.strip()[:120]}")
                     if (
                         len(hits) == _MAX_CONSTRAINTS_PER_FILE
                     ):  # stop reading early
@@ -380,6 +437,15 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
         name = match.group(1)
         if any(noun in name.lower() for noun in nouns):
             terms.append(name)
+
+    # Additional pass: exported function names for TypeScript/TSX
+    if suffix in {".ts", ".tsx"}:
+        for match in _TS_EXPORT_FN_PATTERN.finditer(text):
+            # group(1) = function keyword name, group(2) = const arrow name
+            name = match.group(1) or match.group(2) or ""
+            if name and any(noun in name.lower() for noun in nouns):
+                terms.append(name)
+
     return terms[:5]
 
 
@@ -395,7 +461,7 @@ def _estimate_scope(
     else:
         label = "XL"
     if crosses_boundary:
-        label = {"S": "M", "M": "L", "L": "XL"}.get(label, label)
+        label = {"S": "M", "M": "L"}.get(label, label)
     return (
         label,
         f"{file_count} file(s) matched; boundary crossing: {crosses_boundary}",
@@ -413,7 +479,20 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     nouns = [_sanitize_noun(n) for n in nouns]
 
     noun_set = {n.lower() for n in nouns}
-    all_terms = _expand_synonyms(nouns)
+    project_synonyms = _load_project_synonyms(cwd)
+    effective_map = (
+        {k: list(v) for k, v in _SYNONYM_MAP.items()}
+        if not project_synonyms
+        else {
+            k: list(
+                dict.fromkeys(
+                    _SYNONYM_MAP.get(k, []) + project_synonyms.get(k, [])
+                )
+            )
+            for k in {**_SYNONYM_MAP, **project_synonyms}
+        }
+    )
+    all_terms = _expand_synonyms(nouns, effective_map)
     adjacent_nouns = all_terms[len(nouns) :]
 
     result = ScanResult(feature_area=" | ".join(nouns))

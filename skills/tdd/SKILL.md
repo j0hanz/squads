@@ -26,6 +26,7 @@ Escape hatches from the HARD GATE. Never self-invoke one silently — confirm vi
 When invoked by `receive-plan`/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `parallel-debugging` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
 
 Per-origin delta:
+
 - **`receive-plan`/`dispatch-agents`:** derive interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:`.
 - **`parallel-debugging`:** derive the behavior under test from the repro and its verbatim failing output; skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure, so run the repro test against the existing code and confirm RED.
 

@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Prefer request-plan for multi-task work. Prefer over parallel-debugging when implementing fresh behavior; route unexpected failures of existing code to parallel-debugging.
+description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Prefer [plan](../plan/SKILL.md) for multi-task work. Prefer over parallel-debugging when implementing fresh behavior; route unexpected failures of existing code to parallel-debugging.
 argument-hint: '[feature or behavior to implement]'
 ---
 
@@ -10,7 +10,7 @@ Autonomous TDD execution. **HARD GATE:** No implementation code WITHOUT a failin
 
 ## When NOT to use TDD
 
-Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS (and only that category); then skip TDD and state the reason in the [structured return](../dispatch-agents/SKILL.md#handoff-contract) (gist: "canonical return struct"). Zero-logic boilerplate is not an autonomous escape hatch — if in doubt, write the test. Match the user's request to one of the escape-hatch categories below, then confirm via `AskUserQuestion`:
+Escape hatches from the HARD GATE. Never self-invoke one silently — confirm via `AskUserQuestion` first (the tool supplies a free-text "Other"). Autonomous invocation (no user to ask): escape hatches cannot be confirmed — apply full TDD, unless the approved task's `Action:` text explicitly marks the work pure UI/CSS (and only that category); then skip TDD and state the reason in the [structured return](../dispatch-agents/SKILL.md#handoff-contract). Zero-logic boilerplate is not an autonomous escape hatch — if in doubt, write the test. Match the user's request to one of the escape-hatch categories below, then confirm via `AskUserQuestion`:
 
 **Escape-hatch categories:**
 
@@ -23,11 +23,11 @@ Escape hatches from the HARD GATE. Never self-invoke one silently — confirm vi
 
 ## Autonomous invocation (approved-plan handoff)
 
-When invoked by `receive-plan`/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `parallel-debugging` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
+When invoked by `plan` (validate mode)/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `parallel-debugging` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
 
 Per-origin delta:
 
-- **`receive-plan`/`dispatch-agents`:** derive interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:`.
+- **`plan`/`dispatch-agents`:** derive interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:`.
 - **`parallel-debugging`:** derive the behavior under test from the repro and its verbatim failing output; skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure, so run the repro test against the existing code and confirm RED.
 
 ## Step 0: Confirm Scope
@@ -75,7 +75,7 @@ _If unsure how minimal is minimal, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/refere
 2. Write the smallest implementation that satisfies the test — no speculative generality.
 3. No code added "just in case" — only what the current test requires.
 4. 3 failed attempts on the same test → restart with a smaller test (at most 2 restarts).
-5. After the 2nd restart also fails 3 attempts → escalate to `parallel-debugging` (reproduce and re-isolate the root cause) or `request-plan` (if the design itself is wrong).
+5. After the 2nd restart also fails 3 attempts → escalate to `parallel-debugging` (reproduce and re-isolate the root cause) or [plan](../plan/SKILL.md) (if the design itself is wrong).
 
 ### N-1 Test (False-Green Elimination)
 
@@ -122,6 +122,6 @@ On full behavior-list coverage and a clean REFACTOR, run the full test suite one
 
 | Skill                                                  | Use Case                                                       |
 | :----------------------------------------------------- | :------------------------------------------------------------- |
-| [request-code-review](../request-code-review/SKILL.md) | Fresh-eye review of the completed diff                         |
+| [review](../review/SKILL.md)                           | Fresh-eye review of the completed diff                         |
 | [parallel-debugging](../parallel-debugging/SKILL.md)   | Stuck GREEN (Step 2 escalation) or unrelated final-run failure |
-| [request-plan](../request-plan/SKILL.md)               | Design itself proved wrong mid-cycle                           |
+| [plan](../plan/SKILL.md)                               | Design itself proved wrong mid-cycle                           |

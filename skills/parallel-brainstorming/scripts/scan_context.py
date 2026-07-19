@@ -22,10 +22,10 @@ import os
 import re
 import subprocess
 import sys
+from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any
 
 
 @dataclass
@@ -62,6 +62,9 @@ _MAX_INTERFACE_SHAPES = (
 _MAX_UNKNOWNS = 4  # 4: one per batch; clarifications are capped at 4 per batch
 _MAX_DESIGN_DOCS = 3  # 3: docs rarely add signal beyond the top 3
 _MAX_FILES = 5  # 5: top-N related files kept in the report; higher ranks win
+_MAX_ANALOGOUS = (
+    2  # 2: only seed the Minimalist lane (sorted for run-to-run determinism)
+)
 
 _DOC_GLOBS = [
     "glossary.md",
@@ -115,7 +118,7 @@ _LANG_TYPE_PATTERNS: dict[str, str] = {
 }
 
 
-def _dedupe_stable(items: list[Any]) -> list[str]:
+def _dedupe_stable(items: Iterable[object]) -> list[str]:
     """Deduplicate preserving first-occurrence order."""
     seen: set[str] = set()
     result: list[str] = []
@@ -136,7 +139,7 @@ def _truncate_git_log(log: str, max_lines: int) -> str:
     omitted = len(lines) - len(truncated)
     suffix = f" … +{omitted} more" if omitted > 0 else ""
     body = "\n".join(truncated)
-    return body + suffix if body else (suffix.strip() or "no history")
+    return body + suffix if body else "no history"
 
 
 def _trim_str(value: str, max_chars: int = 200) -> str:
@@ -152,6 +155,11 @@ def _sanitize_noun(raw: str) -> str:
     cleaned = re.sub(r"[^A-Za-z0-9-]", "", raw)
     if not cleaned or cleaned.startswith("-"):
         raise ValueError(f"invalid domain noun after sanitization: {raw!r}")
+    if cleaned != raw:
+        print(
+            f"warning: sanitized noun {raw!r} → {cleaned!r} (non-alphanumeric chars stripped)",
+            file=sys.stderr,
+        )
     return cleaned
 
 
@@ -173,7 +181,7 @@ _SUBPROCESS_TIMEOUT = 15  # 15s: git grep/rg over a mid-size repo returns well w
 def _git_log(path: str, cwd: Path) -> str:
     try:
         result = subprocess.run(
-            ["git", "log", "--oneline", "-5", "--", path],
+            ["git", "log", "--oneline", f"-{_MAX_LOG_LINES}", "--", path],
             capture_output=True,
             text=True,
             cwd=str(cwd),
@@ -241,6 +249,12 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
         print(f"warning: search timed out for {pattern!r}", file=sys.stderr)
         return None
 
+    if rg_result.returncode > 1:
+        print(
+            f"warning: rg failed for {pattern!r}: {rg_result.stderr.strip()}",
+            file=sys.stderr,
+        )
+        return None
     paths = [p for p in rg_result.stdout.splitlines() if p]
     normalized: list[str] = []
     for p in paths:
@@ -268,7 +282,7 @@ def _find_doc_files(cwd: Path) -> list[str]:
             rel = (rel_root / name).as_posix()
             for i, g in enumerate(_DOC_GLOBS):
                 if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, "*/" + g):
-                    buckets[i].append((rel_root / name).as_posix())
+                    buckets[i].append(rel)
                     break
     return [p for bucket in buckets for p in bucket]
 
@@ -389,7 +403,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     adjacent_paths: set[str] = set()
     search_failed: list[str] = []
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor() as pool:  # default: min(32, os.cpu_count() + 4)
         # Submit in noun order; iterate results in the same order (not
         # completion order) so related_files is deterministic across runs.
         grep_futures = [
@@ -452,12 +466,10 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     ]  # keep the highest-ranked files
 
     # Record analogous features (files found only via adjacent synonyms)
-    result.analogous_features = sorted(adjacent_paths)[
-        :2
-    ]  # 2: only seed the Minimalist lane (sorted for run-to-run determinism)
+    result.analogous_features = sorted(adjacent_paths)[:_MAX_ANALOGOUS]
 
     # ── Phase 2: parallel git log + constraints + term extraction + test files ──
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor() as pool:  # default: min(32, os.cpu_count() + 4)
         log_futures = {
             pool.submit(_git_log, f.path, cwd): f for f in result.related_files
         }
@@ -542,8 +554,8 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     result.design_docs = _dedupe_stable(result.design_docs)[:_MAX_DESIGN_DOCS]
     result.unknowns = _dedupe_stable(result.unknowns)[:_MAX_UNKNOWNS]
     result.analogous_features = _dedupe_stable(result.analogous_features)[
-        :2
-    ]  # 2: only seed the Minimalist lane
+        :_MAX_ANALOGOUS
+    ]
     result.scope_reasoning = _trim_str(result.scope_reasoning, 150)
 
     return result

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stateful enforcement of parallel-debugging's HARD GATE: while that skill is
 # active in this session, code edits are denied until the root cause is routed
-# to a sibling skill (tdd / request-plan) — "no fix before reproduce, isolate".
+# to a sibling skill (tdd / plan) — "no fix before reproduce, isolate".
 # Markdown and test files stay editable (investigation notes and repro
 # harnesses are legitimate during debugging). The gate is per-session and
 # expires after 120 minutes so an abandoned debug run cannot wedge the session.
@@ -24,12 +24,12 @@ case "$tool" in
       squads:parallel-debugging | parallel-debugging)
         touch "$flag"
         ;;
-      squads:tdd | tdd | squads:request-plan | request-plan | \
-        squads:receive-code-review | receive-code-review)
-        # Routing to a debugging hand-off (tdd, request-plan) or a legit
-        # route-out (receive-code-review: review feedback, not a bug) closes
-        # the gate. dispatch-agents / receive-plan / request-code-review are
-        # NOT hand-offs — letting them lift the gate bypasses reproduce-first.
+      squads:tdd | tdd | squads:plan | plan | \
+        squads:review | review)
+        # Routing to a debugging hand-off (tdd, plan) or a legit
+        # route-out (review: review feedback, not a bug) closes
+        # the gate. dispatch-agents is NOT a hand-off — letting it lift
+        # the gate bypasses reproduce-first.
         rm -f "$flag"
         ;;
     esac
@@ -57,7 +57,7 @@ case "$tool" in
         exit 0 ;;
     esac
 
-    echo "squads debug-gate: parallel-debugging is active — its HARD GATE forbids code edits before the root cause is reproduced, adversarially verified, and routed to tdd (logic bug) or request-plan (design-level). Invoke the routing skill first; if debugging was abandoned, remove $flag." >&2
+    echo "squads debug-gate: parallel-debugging is active — its HARD GATE forbids code edits before the root cause is reproduced, adversarially verified, and routed to tdd (logic bug) or plan (design-level). Invoke the routing skill first; if debugging was abandoned, remove $flag." >&2
     exit 2
     ;;
 esac

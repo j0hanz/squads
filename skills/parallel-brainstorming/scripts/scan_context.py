@@ -56,7 +56,10 @@ _SKIP_DIRS = frozenset(
 )
 
 _MAX_LOG_LINES = 3  # 3: recent commit signals decay fast; more lines add noise
-_MAX_CONSTRAINTS = 5  # 5: enough to surface limits without flooding the brief
+_MAX_CONSTRAINTS_PER_FILE = (
+    3  # 3: stop reading a file early; keeps per-file signal tight
+)
+_MAX_CONSTRAINTS = 5  # 5: global cap across all files (max collectible: _MAX_CONSTRAINTS_PER_FILE x _MAX_FILES)
 _MAX_INTERFACE_SHAPES = (
     10  # 10: shapes are cheap tokens and often decisive for design
 )
@@ -333,7 +336,9 @@ def _scan_constraints(file_path: Path) -> list[str]:
                     hits.append(
                         f"{file_path.name}:{line_no}: {line.strip()[:120]}"
                     )
-                    if len(hits) == 3:  # cap reached — stop reading early
+                    if (
+                        len(hits) == _MAX_CONSTRAINTS_PER_FILE
+                    ):  # stop reading early
                         break
     except OSError:
         return []
@@ -405,6 +410,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     """
     if not nouns:
         raise ValueError("scan() requires at least one domain noun")
+    nouns = [_sanitize_noun(n) for n in nouns]
 
     noun_set = {n.lower() for n in nouns}
     all_terms = _expand_synonyms(nouns)
@@ -484,7 +490,9 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
 
     # ── Phase 2: parallel git log + constraints + term extraction + test files ──
     # Cap workers: phase 2 tasks are bounded by _MAX_FILES (5 files x 4 task types)
-    _phase2_workers = min(32, _MAX_FILES * 4)
+    _phase2_workers = (
+        _MAX_FILES * 4
+    )  # 20: 5 files x 4 task types (log, constraints, shapes, tests)
     with ThreadPoolExecutor(max_workers=_phase2_workers) as pool:
         log_futures = {
             pool.submit(_git_log, f.path, cwd): f for f in result.related_files

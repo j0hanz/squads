@@ -23,9 +23,11 @@ Escape hatches from the HARD GATE. Never self-invoke one silently — confirm vi
 
 ## Autonomous invocation (approved-plan handoff)
 
-When invoked by `receive-plan` or `dispatch-agents` with a task from an APPROVED `docs/plan/<name>.plan.md`, skip Step 0 and the Pre-TDD `AskUserQuestion` gates — plan approval already locked scope and interface. Derive the interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:` fields, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
+When invoked by `receive-plan`/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `parallel-debugging` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
 
-When invoked by `parallel-debugging` with a minimal repro as the RED test, skip Step 0 and the Pre-TDD `AskUserQuestion` gates — the reproducing case and root-cause isolation are already locked. Derive the behavior under test from the repro and its verbatim failing output, state it in one line, and enter the TDD Cycle at RED. Skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure; run the repro test against the existing code and confirm RED. All other gates still apply unchanged.
+Per-origin delta:
+- **`receive-plan`/`dispatch-agents`:** derive interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:`.
+- **`parallel-debugging`:** derive the behavior under test from the repro and its verbatim failing output; skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure, so run the repro test against the existing code and confirm RED.
 
 ## Step 0: Confirm Scope
 

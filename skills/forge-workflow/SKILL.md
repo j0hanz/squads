@@ -1,14 +1,12 @@
 ---
 name: forge-workflow
-description: Compose and generate native dynamic workflow scripts for bulk multi-agent orchestration — fan-out audits, adversarial verify, generate-and-filter, tournament, classify-and-act, loop-until-done, and debug-verify. Use when a bulk or fan-out job is recurring or large enough to warrant a saved `/command` workflow, or when parallel-debugging needs the debug-verify recipe. Not for one-off small fleets — dispatch-agents handles those inline.
+description: Use when a bulk or fan-out job is recurring or large enough to warrant a saved `/command` workflow, or when parallel-debugging needs the debug-verify recipe. Not for one-off small fleets — dispatch-agents handles those inline.
 argument-hint: '<feature description or recipe name>'
 ---
 
 # forge-workflow
 
 Forge composes native dynamic workflow scripts from a small canon of orchestration shapes and a recipe catalog. Output is a saved `.claude/workflows/<name>.js` plus a `docs/workflows/CATALOG.md` entry. The plugin ships markdown only — forge generates scripts at runtime; nothing generated is shipped with the plugin.
-
-Three core sections define the contract every generated script must satisfy, the canon of shapes (single source, cited by other skills), and the recipe catalog that maps an archetype to a composition.
 
 ## Generation Contract
 
@@ -79,10 +77,10 @@ A recipe is **read-only class** when no stage's `agent()` prompt permits file wr
 
 ## Next Skills
 
-| Skill                                                | Use Case                                                                |
-| :--------------------------------------------------- | :---------------------------------------------------------------------- |
-| [dispatch-agents](../dispatch-agents/SKILL.md)       | Triage and one-off small fleets; cites this canon for shapes and quorum |
-| [parallel-debugging](../parallel-debugging/SKILL.md) | Consumes the `debug-verify` recipe and the canonical quorum table       |
+| Skill                                                | Use Case                                                                  |
+| :--------------------------------------------------- | :------------------------------------------------------------------------ |
+| [dispatch-agents](../dispatch-agents/SKILL.md)       | Governor and one-off small fleets; cites this canon for shapes and quorum |
+| [parallel-debugging](../parallel-debugging/SKILL.md) | Consumes the `debug-verify` recipe and the canonical quorum table         |
 
 ## Procedure
 
@@ -119,176 +117,11 @@ Run before save. HIGH items gate save; a failed HIGH item blocks save. Lower ite
 
 ### Plant-breach drill
 
-A runnable drill that exercises the two HIGH items above. It plants two breach inputs in a temp dir and asserts the checklist catches each: (1) a write-breach investigator prompt (`agent()` description containing "write the fix") — the no-write clause grep must flag it; (2) a stage-omitted script (a generated script missing a required stage named in its recipe) — the recipe-vs-script required-stage diff must flag it. Extracts and runs as-is.
-
-<!-- drill:start -->
-
-```bash
-set -u
-tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
-
-# Breach #1: write-breach investigator prompt — an agent() description containing "write the fix".
-cat > "$tmp/investigator.txt" <<'EOF'
-Investigate the hypothesis. You may write the fix directly into the source file if confident.
-EOF
-
-# HIGH item 1 — no-write clause grep: flags any investigator prompt permitting writes.
-if ! grep -qiE "write|edit|patch|fix the|create|modify|delete|overwrite" "$tmp/investigator.txt"; then
-  echo "FAIL: write-breach not caught" >&2
-  exit 1
-fi
-
-# Breach #2: stage-omitted script — recipe declares refute, generated script misses it.
-printf 'stages: investigate, refute, tally\n' > "$tmp/recipe.txt"
-cat > "$tmp/script.js" <<'EOF'
-// Stage: investigate
-agent({ description: "investigator" });
-// Stage: tally
-agent({ description: "tally" });
-EOF
-
-# HIGH item 2 — recipe-vs-script required-stage diff: every recipe stage must appear in the script.
-stages=$(sed -n 's/^stages: //p' "$tmp/recipe.txt" | tr ',' ' ')
-missing=""
-for stage in $stages; do
-  if ! grep -qiE "Stage: $stage" "$tmp/script.js"; then
-    missing="$missing $stage"
-  fi
-done
-
-if [ -z "$missing" ]; then
-  echo "FAIL: stage-omission not caught" >&2
-  exit 1
-fi
-
-echo "both breaches caught"
-exit 0
-```
-
-<!-- drill:end -->
+A runnable drill that exercises the two HIGH items above. It plants two breach inputs in a temp dir and asserts the checklist catches each: (1) a write-breach investigator prompt (`agent()` description containing "write the fix") — the no-write clause grep must flag it; (2) a stage-omitted script (a generated script missing a required stage named in its recipe) — the recipe-vs-script required-stage diff must flag it. See `references/plant-breach-drill.sh` (runs as-is).
 
 ## Annotated `debug-verify` example script
 
-Reference-only. This is a markdown code block showing a representative `debug-verify` workflow script with the four required annotations as inline comments. It is illustrative documentation inside this skill — the plugin still ships markdown only; nothing here is a shipped artifact.
-
-```javascript
-// debug-verify.js — illustrative, not shipped. Read-only class.
-// Args: { hypotheses: [], repro_cmd, failing_output, rubric }
-const args = workflow.args || {};
-const hypotheses = args.hypotheses || [];
-const repro_cmd = args.repro_cmd || '';
-const failing_output = args.failing_output || '';
-const rubric = args.rubric || 'refute the root-cause claim with minimal reproducer';
-const SKEPTICS_PER = 2; // recipe default
-const MAX_ROUNDS = Math.max(4, Math.ceil(hypotheses.length / 2)); // loop ceiling
-
-const handoffSchema = {
-  type: 'object',
-  properties: {
-    status: { type: 'string' },
-    completed: { type: 'array' },
-    skipped: { type: 'array' },
-    findings: { type: 'array' },
-    commands: { type: 'array' },
-    artifacts: { type: 'array' },
-  },
-  required: ['status', 'findings'],
-};
-
-let seen = new Set(); // (file:line, classification) dedupe across rounds
-let roundLog = [];
-let noSurvivorRounds = 0;
-
-for (let round = 1; round <= MAX_ROUNDS; round++) {
-  // ===== each stage: investigator (blind, per-hyp) → truncation → skeptic → quorum =====
-  // Stage A — investigators: one agent() per hypothesis, blind to each other.
-  const investigations = await Promise.all(
-    hypotheses.map((hyp) =>
-      agent({
-        description: `Investigate hypothesis: ${hyp}. You are read-only; do not write, edit, create, modify, or delete any file. Report root cause only.`,
-        model: 'haiku',
-        schema: handoffSchema,
-        prompt: `Repro: ${repro_cmd}\nFailing output:\n${failing_output}\nHypothesis: ${hyp}\nReturn a Handoff Contract.`,
-      }),
-    ),
-  );
-
-  // Stage B — in-script bare-claim truncation between generator and skeptic.
-  // ===== truncation point: generator reasoning stripped here, only bare claim passes =====
-  const bareClaims = investigations
-    .flatMap((r) =>
-      (r.findings || []).map((f) => {
-        // Truncate to: "root cause is <X> at <file:line>, classified as <logic|design-level>"
-        const m = /root cause is (.+?) at ([^,\s]+:\d+), classified as (logic|design-level)/.exec(
-          f.summary || '',
-        );
-        if (!m) return null; // drop claims lacking the (file:line, classification) tuple
-        return { claim: m[0], file_line: m[2], classification: m[3] };
-      }),
-    )
-    .filter(Boolean)
-    .filter((c) => {
-      const k = `${c.file_line}|${c.classification}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-
-  if (bareClaims.length === 0) {
-    noSurvivorRounds++;
-    if (noSurvivorRounds >= 2) break;
-    continue;
-  }
-  noSurvivorRounds = 0;
-
-  // Stage C — skeptics: SKEPTICS_PER fresh skeptics per claim, prompted to REFUTE.
-  const verdicts = await Promise.all(
-    bareClaims.flatMap((c) =>
-      Array.from({ length: SKEPTICS_PER }, (_, i) =>
-        agent({
-          description: `Skeptic ${i} for claim: ${c.claim}. You are read-only; do not write, edit, create, modify, or delete any file. Refute this claim or abstain.`,
-          model: 'haiku',
-          schema: handoffSchema,
-          prompt: `Claim: ${c.claim}\nRubric: ${rubric}\nAngle ${i}: attack from a different refutation angle. Return CONFIRMED/REFUTED/ABSTAIN in findings.`,
-        }),
-      ),
-    ),
-  );
-
-  // Stage D — quorum tally per the canonical table.
-  // ===== quorum tally: 2 skeptics → dies if ≥1 refutes; abstain = 0.5 refutation =====
-  const survivors = bareClaims.filter((c, i) => {
-    const vs = verdicts.slice(i * SKEPTICS_PER, (i + 1) * SKEPTICS_PER);
-    const refutes = vs.filter((v) =>
-      (v.findings || []).some((f) => /REFUTED/.test(f.summary || '')),
-    ).length;
-    const abstains = vs.filter((v) =>
-      (v.findings || []).some((f) => /ABSTAIN/.test(f.summary || '')),
-    ).length;
-    const score = refutes + 0.5 * abstains;
-    return score < 1; // 2-skeptic row: dies when ≥1 refutes
-  });
-
-  roundLog.push({ round, claims: bareClaims.length, survivors: survivors.length });
-  if (survivors.length === 0) noSurvivorRounds++;
-  else noSurvivorRounds = 0;
-
-  // ===== stop condition: 2 consecutive no-survivor rounds OR absolute ceiling =====
-  if (noSurvivorRounds >= 2) break;
-}
-
-return {
-  status: roundLog.some((r) => r.survivors > 0) ? 'PARTIAL' : 'PASS',
-  completed: [],
-  skipped: [],
-  findings: roundLog,
-  commands: [],
-  artifacts: [],
-};
-```
-
-Four required annotations, marked inline above: **each stage** (Stage A/B/C/D labeled), **truncation point** (Stage B comment), **quorum tally** (Stage D comment), **stop condition** (loop-bottom comment).
+Reference-only — illustrative, not a shipped artifact. See `references/debug-verify-example.js.md` for a representative `debug-verify` workflow script with the four required annotations (each stage, truncation point, quorum tally, stop condition) as inline comments.
 
 ## Preflight
 
@@ -297,11 +130,3 @@ Once per session, before any other Procedure step. Asserts native dynamic workfl
 - **Check:** Claude Code version ≥ **2.1.154** AND a paid plan AND dynamic workflows not disabled. The runtime is a plugin-level hard dependency for bulk and debug fan-out.
 - **On failure:** abort forge with a clear message — "Native dynamic workflows unavailable (need CC ≥ 2.1.154, paid plan, not disabled). Cannot forge. No fallback." Do not silently degrade to turn-by-turn Agent dispatches; the Procedure's invariants (in-script truncation, quorum tally, agent-count cap) are unenforceable outside the runtime.
 - **No fallback:** this is a user decision recorded in the design brief — one execution path. Forge refuses to generate a workflow it cannot smoke-slice in the native runtime.
-
-## Generated artifacts
-
-The Procedure emits two per-project artifacts at CATALOG.md-append time (step 9): the workflow script `.claude/workflows/<name>.js` and a row appended to `docs/workflows/CATALOG.md`. Both are per-project outputs, produced by the forge Procedure in the host project — they are never committed to the plugin repo, and no `.js` ships plugin-wide. The plugin ships markdown only (per AGENTS.md); generated scripts live in the host project's `.claude/workflows/` and are referenced from that project's `docs/workflows/CATALOG.md`.
-
-The per-project `docs/workflows/CATALOG.md` has columns: **name**, **recipe**, **args signature**, **scale**, **fetch/edit class**, **last-verified** date. Each row is produced by the forge Procedure at CATALOG.md-append time, recording the `args` signature, scale, and fetch/edit class carried forward from the chosen Recipe Catalog row, plus the last-verified date stamped on the smoke-slice green run. The column set is fixed; forge appends one row per generated workflow, never rewriting prior rows.
-
-Generated `.claude/workflows/<name>.js` and `docs/workflows/CATALOG.md` are per-project, never committed to the plugin repo; no .js ships plugin-wide.

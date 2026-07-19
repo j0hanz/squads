@@ -68,13 +68,9 @@ The `debug-verify` script enforces all guardrails in-code:
 - **stop on 2 consecutive no-survivor rounds or ceiling** — `ceil(N/2)` total rounds where N = initial hypothesis count, minimum 4.
 - **returns round log + survivors + refutation trail** in [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) shape.
 
-**behavioral change: previously local-majority rule, now unified quorum (abstain=0.5, ceiling `ceil(N/2)` min 4)** — the old Step 3.2 local-majority rule is retired; quorum is now the canonical unified tally from forge-workflow's Pattern Canon, not a per-skill rule.
-
-Step-numbering gap: there is no Step 3. The gap is intentional — old Steps 2 (fan out) and 3 (adversarial verify) collapsed into this single Step 2; anchors for Steps 0/1/4/5 are preserved.
-
 **Done when:** `debug-verify` returns a Handoff Contract with round log, survivors (each carrying refutation-responses), and refutation trail; or loop-back stop condition met and user escalated.
 
-## Step 4: Synthesize the confirmed root cause
+## Step 3: Synthesize the confirmed root cause
 
 1. Main thread reads verified hypotheses directly — no Arbiter agent; main thread synthesizes genuinely independent results (dispatch-agents' hub-and-spoke). Dedupe against everything seen (including refuted hypotheses). Picked root cause must cite surviving skeptic dispatch and its refutation-responses — cause surviving no real skeptic is unverified.
 2. Multiple survive: pick single root cause all failing paths route through; reject causes explaining only reported path. Cause stated without checking callers is symptom, not root cause.
@@ -85,23 +81,15 @@ Step-numbering gap: there is no Step 3. The gap is intentional — old Steps 2 (
 
 **Done when:** one root cause named at `file:line` with one-sentence why, surviving skeptic dispatch cited, caller graph checked, classified as logic (default) or design-level (with wrong contract named).
 
-## Step 5: Route the Fix
+## Step 4: Route the Fix
 
 1. **Logic bug, route `tdd`:** hand over minimal repro with verbatim failing output as RED test; `tdd` drives RED-GREEN-REFACTOR for fix.
 2. **Design-level failure, route `plan`:** re-draft affected scope, then `plan` (validate mode) validates, then `dispatch-agents`/`tdd` executes.
 3. **Root cause dead or unused code:** propose deletion (with `git grep` proving no callers), not patch.
 
-HARD GATE applies (see Strict Rules): route root cause and repro; don't prescribe patch. Invoke sibling skill and stop.
+HARD GATE applies — route root cause and repro; don't prescribe patch. Invoke sibling skill and stop.
 
 **Done when:** fix handed to `tdd` (logic bug, minimal repro + verbatim output as RED) or `plan` (design-level, wrong contract named), or deletion proposed with proof of no callers.
-
-## Strict Rules
-
-- **No fix without reproducing case** (HARD GATE): observe failure before changing code.
-- **Reproduction shown, not asserted:** quote command and verbatim failure output.
-- **No symptom patches:** fix root cause where all failing paths route through — check caller graph first.
-- **No guessing on non-repro:** escalate for repro; don't edit or suggest edits while blocked.
-- **Default to logic bug on ambiguity:** design-level call must name wrong contract.
 
 ## Next Skills
 

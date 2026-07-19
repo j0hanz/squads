@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Prefer [plan](../plan/SKILL.md) for multi-task work. Prefer over parallel-debugging when implementing fresh behavior; route unexpected failures of existing code to parallel-debugging.
+description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Prefer parallel-debugging when the failure is in existing code, not fresh behavior.
 argument-hint: '[feature or behavior to implement]'
 ---
 

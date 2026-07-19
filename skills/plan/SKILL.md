@@ -92,10 +92,15 @@ Report `N_passed / N_total` per category. Any `N_passed < N_total` → REVISE wi
 Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer drafting context — judge ≠ generator.
 
 - **`contract`** — 1 critic, all three lenses in a single pass, lighter check focused on scope boundaries and dependency cycles. Lens rubrics below still apply; one agent holds all three.
-- **`blueprint`** — 3 critics dispatched in ONE message, one per lens, blind to each other:
-  - **Spec-Correctness** — High: a REQ contradicts another or is met by no task; Med: REQ ambiguous or only partially covered; Low: naming/format nit.
-  - **Dependency Order** — High: cycle in `Depends on:` graph, or task scheduled before its dependency; Med: parallelizable tasks over-serialized, or missing transitive link; Low: suboptimal but valid order.
-  - **Scope-Risk** — High: task touches >3 files or crosses a contract boundary with no `Depends on:`; Med: oversized single task or underspecified `Validate:`; Low: minor risk, localizable.
+- **`blueprint`** — 3 critics dispatched in ONE message, one per lens, blind to each other.
+
+Lens rubrics (each critic returns findings per its lens):
+
+| Lens             | High                                                                       | Med                                                              | Low                        |
+| ---------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------- |
+| Spec-Correctness | a REQ contradicts another or is met by no task                             | REQ ambiguous or only partially covered                          | naming/format nit          |
+| Dependency Order | cycle in `Depends on:` graph, or task scheduled before its dependency      | parallelizable tasks over-serialized, or missing transitive link | suboptimal but valid order |
+| Scope-Risk       | task touches >3 files or crosses a contract boundary with no `Depends on:` | oversized single task or underspecified `Validate:`              | minor risk, localizable    |
 
 Each critic returns itemized findings with `file:line` / `REQ-id` / `TASK-id` specificity and severity per its lens rubric — never a bare summary; this follows the [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) `findings` shape. A critic returning bare summary or malformed output is re-dispatched once with a reminder of the required itemized format; a second malformed return → escalate to user (interactive) or return failure to the requesting skill (autonomous).
 
@@ -140,7 +145,7 @@ Detail: [Specific requirement statement]
 
 - **NO Prompt at Step 0**: draft depth inferred — never pause for `AskUserQuestion`.
 - **NO Re-Scan / Cross-Talk / Mocked Ideators (draft)**: pass the Context Report to ideators; ideators are distinct subagents, blind to each other; main thread can't generate them itself.
-- **NO Shell Execution (draft)**: during discovery/drafting/synthesis, except `${CLAUDE_PLUGIN_ROOT}/skills/parallel-brainstorming/scripts/scan_context.py` for codebase scanning.
+- **NO Shell Execution (draft)**: during discovery/drafting/synthesis.
 - **NO Schema at Draft Stage**: ideators write lightweight proposals; schema is synthesis-only.
 - **NO Self-Verify / Execute Validate / Arbiter Agent (validate)**: draft-mode synthesis never substitutes for this gate; never run a plan's `Validate:` — grep/file-read only; main thread reads critic findings, no Arbiter agent.
 - **NO Endless Loops (validate)**: max 1 REVISE round-trip; escalate on the 2nd.

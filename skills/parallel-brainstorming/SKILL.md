@@ -1,6 +1,6 @@
 ---
 name: parallel-brainstorming
-description: Use when requirements are vague or the solution space is open before a plan exists. Prefer over [plan](../plan/SKILL.md) when two or more distinct architectural approaches are in play.
+description: Use when requirements are vague, the solution space is open, AND two or more distinct architectural approaches are in play, before a plan exists.
 argument-hint: '[feature request or problem to explore]'
 ---
 
@@ -10,7 +10,7 @@ argument-hint: '[feature request or problem to explore]'
 
 ## Process Flow
 
-This skill uses `Phase 1-6`, not the linear `Step 0-5` of the execution skills — phases, not steps, because ideation is a cyclic loop (checkpoint + REVISE loop-back) rather than a one-way path.
+This skill uses `Phase 1-6` — phases, not steps, because ideation is a cyclic loop (checkpoint + REVISE loop-back) rather than a one-way path.
 
 1 → (2 if ambiguous) → Creative Checkpoint → 3 → 4 → (5 if flagged: APPROVED → 6, REVISE → loop in 5, REJECT → 3 or stop) → 6
 
@@ -59,7 +59,7 @@ This skill uses `Phase 1-6`, not the linear `Step 0-5` of the execution skills �
 
 - **Output (per approach):** Idea, core mechanism, winning factor, key risk, first step.
 
-**Done when:** approaches generated in one response (one Minimalist), each with idea, core mechanism, winning factor, key risk, first step. Count matches Scope: S=2, M=2–3, L=3, XL=3 per slice.
+**Done when:** approaches generated in one response (one Minimalist), each with idea, core mechanism, winning factor, key risk, first step; count per line 50.
 
 ## Phase 4: Convergence & Synthesis
 

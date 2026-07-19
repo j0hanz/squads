@@ -84,7 +84,7 @@ Resolve code review feedback received from a human, bot, or subagent.
 
 - **No Performative Acknowledgment:** skip thanks/agreement framing; state the fix direct.
 - **No Blind Implementation:** verify every finding against the codebase before edit — trust governs how much you push back, not whether you verify.
-- **No Rule Override:** `AGENTS.md` and explicit user instructions govern; surface conflicts.
+- **No Rule Override:** Explicit user instructions govern; surface conflicts.
 - **No Unbounded Scope:** fixes touching 10+ files, or a module imported by 5+ other files (check via `git grep -l "<module>"`), need user confirmation before implement.
 - **No Re-Review Loops:** cap re-review at 2 passes; on the 3rd, escalate to the user. Pass count comes from the plan header when a plan file exists, else the `Review pass: N` line in the feedback being resolved; a missing line = pass 1 — per [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract).
 
@@ -96,10 +96,9 @@ Resolve code review feedback received from a human, bot, or subagent.
 
 ### Step 2: Verify Finding
 
-1. Read `AGENTS.md` before making any change.
-2. Confirm via `git grep` that the finding's premise still holds (reject stale findings).
-3. For security or correctness findings, trace the root cause before patching — fix the source, not the symptom.
-4. If code is confirmed dead or unused, propose deletion instead of a patch.
+1. Confirm via `git grep` that the finding's premise still holds (reject stale findings).
+2. For security or correctness findings, trace the root cause before patching — fix the source, not the symptom.
+3. If code is confirmed dead or unused, propose deletion instead of a patch.
 
 ### Step 3: Implement
 
@@ -116,6 +115,6 @@ Resolve code review feedback received from a human, bot, or subagent.
 
 ## Next Skills
 
-| Skill                                              | Use Case                                                  |
-| :------------------------------------------------- | :-------------------------------------------------------- |
+| Skill                                                | Use Case                                                  |
+| :--------------------------------------------------- | :-------------------------------------------------------- |
 | [parallel-debugging](../parallel-debugging/SKILL.md) | Post-fix test run fails — reproduce/isolate before re-fix |

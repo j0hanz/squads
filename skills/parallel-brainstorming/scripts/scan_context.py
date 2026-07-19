@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import fnmatch
 import json
 import os
 import re
@@ -43,7 +42,6 @@ class ScanResult:
     related_files: list[FileSignal] = field(default_factory=list)
     interface_shapes: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
-    design_docs: list[str] = field(default_factory=list)
     analogous_features: list[str] = field(default_factory=list)
     scope: str = "M"
     scope_reasoning: str = ""
@@ -64,23 +62,10 @@ _MAX_INTERFACE_SHAPES = (
     10  # 10: shapes are cheap tokens and often decisive for design
 )
 _MAX_UNKNOWNS = 4  # 4: one per batch; clarifications are capped at 4 per batch
-_MAX_DESIGN_DOCS = 3  # 3: docs rarely add signal beyond the top 3
 _MAX_FILES = 5  # 5: top-N related files kept in the report; higher ranks win
 _MAX_ANALOGOUS = (
     2  # 2: only seed the Minimalist lane (sorted for run-to-run determinism)
 )
-
-_DOC_GLOBS = [
-    "glossary.md",
-    "CONTEXT.md",
-    "ARCHITECTURE.md",
-    "docs/adr/*.md",
-    "decisions/*.md",
-    "docs/design/*.md",
-]
-_MAX_DOC_DEPTH = 4  # 4: deepest glob is 3 segments + one nesting prefix; bounds the walk on large repos
-# Pre-build (glob, */glob) pairs once so _find_doc_files avoids per-file string alloc
-_DOC_GLOB_PAIRS: list[tuple[str, str]] = [(g, "*/" + g) for g in _DOC_GLOBS]
 
 _CONSTRAINT_PATTERNS = [
     "TODO",
@@ -324,22 +309,6 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
     return normalized
 
 
-def _find_doc_files(cwd: Path) -> list[str]:
-    buckets: list[list[str]] = [[] for _ in _DOC_GLOB_PAIRS]
-    for root, dirnames, filenames in os.walk(cwd):
-        dirnames[:] = sorted(d for d in dirnames if d not in _SKIP_DIRS)
-        rel_root = Path(root).relative_to(cwd)
-        if len(rel_root.parts) >= _MAX_DOC_DEPTH:
-            dirnames[:] = []
-        for name in sorted(filenames):
-            rel = (rel_root / name).as_posix()
-            for i, (g, prefixed_g) in enumerate(_DOC_GLOB_PAIRS):
-                if fnmatch.fnmatch(rel, g) or fnmatch.fnmatch(rel, prefixed_g):
-                    buckets[i].append(rel)
-                    break
-    return [p for bucket in buckets for p in bucket]
-
-
 def _find_test_file(file_path: Path, cwd: Path) -> str:
     """Return the relative path of a test file for the given source file, or ''."""
     stem = file_path.stem
@@ -471,8 +440,8 @@ def _estimate_scope(
 def scan(nouns: list[str], cwd: Path) -> ScanResult:
     """Scan the codebase for context relevant to the given domain nouns.
 
-    Returns a ScanResult with related files, terminology, constraints, design
-    docs, analogous features, test coverage, scope estimate, and unknowns.
+    Returns a ScanResult with related files, terminology, constraints,
+    analogous features, test coverage, scope estimate, and unknowns.
     """
     if not nouns:
         raise ValueError("scan() requires at least one domain noun")
@@ -497,12 +466,12 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
 
     result = ScanResult(feature_area=" | ".join(nouns))
 
-    # ── Phase 1: parallel grep + doc discovery ──────────────────────────────
+    # ── Phase 1: parallel grep ──────────────────────────────────────────────
     adjacent_paths: set[str] = set()
     search_failed: list[str] = []
 
-    # Cap workers: phase 1 has len(all_terms) grep tasks + 1 doc task
-    _phase1_workers = min(32, len(all_terms) + 1)
+    # Cap workers: phase 1 has len(all_terms) grep tasks
+    _phase1_workers = min(32, len(all_terms))
     with ThreadPoolExecutor(max_workers=_phase1_workers) as pool:
         # Submit in noun order; iterate results in the same order (not
         # completion order) so related_files is deterministic across runs.
@@ -513,7 +482,6 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             (noun, pool.submit(_grep_files, noun, cwd))
             for noun in adjacent_nouns
         ]
-        doc_future = pool.submit(_find_doc_files, cwd)
 
         match_counts: Counter[str] = Counter()
         for noun, fut in grep_futures:
@@ -537,12 +505,6 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
                     and path_str not in adjacent_paths
                 ):
                     adjacent_paths.add(path_str)
-
-        result.design_docs = doc_future.result()
-        if not result.design_docs:
-            result.unknowns.append(
-                "No glossary, ADR, or architecture docs found"
-            )
 
     if search_failed:
         result.unknowns.append(
@@ -654,7 +616,6 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         :_MAX_INTERFACE_SHAPES
     ]
     result.constraints = _dedupe_stable(result.constraints)[:_MAX_CONSTRAINTS]
-    result.design_docs = _dedupe_stable(result.design_docs)[:_MAX_DESIGN_DOCS]
     result.unknowns = _dedupe_stable(result.unknowns)[:_MAX_UNKNOWNS]
     result.analogous_features = _dedupe_stable(result.analogous_features)[
         :_MAX_ANALOGOUS

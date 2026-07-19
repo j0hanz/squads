@@ -10,6 +10,8 @@ argument-hint: '[feature request or problem to explore]'
 
 ## Process Flow
 
+This skill uses `Phase 1-6`, not the linear `Step 0-5` of the execution skills — phases, not steps, because ideation is a cyclic loop (checkpoint + REVISE loop-back) rather than a one-way path.
+
 1 → (2 if ambiguous) → Creative Checkpoint → 3 → 4 → (5 if flagged: APPROVED → 6, REVISE → loop in 5, REJECT → 3 or stop) → 6
 
 ## Phase 1: Framing & Discovery

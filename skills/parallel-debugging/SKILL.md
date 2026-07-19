@@ -12,9 +12,9 @@ argument-hint: '[symptom: failing test, command, or error]'
 
 Route out instead of debugging:
 
-- **Missing feature, no code exists yet:** not bug. Route to `request-plan` (multi-task) or `tdd` (single behavior).
-- **Review feedback on verified diff:** route to `receive-code-review`.
-- **Plan or spec itself wrong:** route to `request-plan` to re-draft.
+- **Missing feature, no code exists yet:** not bug. Route to [plan](../plan/SKILL.md) (multi-task) or `tdd` (single behavior).
+- **Review feedback on verified diff:** route to [review](../review/SKILL.md).
+- **Plan or spec itself wrong:** route to [plan](../plan/SKILL.md) to re-draft.
 - **Already ran reproducing test, saw it fail** (and `tdd` didn't escalate here): gate satisfied — proceed to `tdd` with that test as RED.
 - **`tdd` escalated here after failed GREEN attempts on that same test:** repro gate already met — proceed direct to Step 2, isolate why implementation can't pass.
 
@@ -55,7 +55,7 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 1. Enumerate distinct root-cause hypotheses (from repro, stack trace, failing function's callers). One investigator per hypothesis, blind to each other.
 2. Write rubric confirmed root cause must satisfy _before_ investigating — single-thread included (Criteria before dispatch; criteria written after result only confirm guesses): reproduces symptom, all failing paths route through it, classification named.
 3. Dispatch investigators in ONE message, each given repro + verbatim failing output + assigned hypothesis. Read-only — deny write/edit tools. Cap ~10; log if truncated.
-4. Each returns [structured finding](../dispatch-agents/SKILL.md#handoff-contract) (see Invariants) (gist: "canonical return struct"): hypothesis, `file:line`, caller-graph `git grep`, classification, minimal-repro verbatim output. No fixes.
+4. Each returns [structured finding](../dispatch-agents/SKILL.md#handoff-contract) (see Invariants): hypothesis, `file:line`, caller-graph `git grep`, classification, minimal-repro verbatim output. No fixes.
 
 **Done when:** rubric written first, then all investigators dispatched in ONE message and each returns structured read-only finding, or (single-thread path) one hypothesis investigated inline with same structured return — then proceed to Step 3; not terminal closure for single-thread path.
 
@@ -75,20 +75,20 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 3. Classify:
    - **Logic bug** — wrong code in unit; no interface or contract wrong. Default here on ambiguity.
    - **Design-level failure** — named contract, interface, or data model wrong; fix crosses file boundaries. Must name wrong contract.
-   - Tie-breaker for tests-green/prod-red: existing test calls real function on failing input and still passes, that's design-level (test/prod divergence), route `request-plan`; existing test never calls failing input (missing edge), that's logic bug, route `tdd`. Concurrency: race on shared field fixed by local synchronization plus missing concurrent test, logic bug, route `tdd`; race requiring declaring shared service thread-safe across callers, design-level, name wrong contract.
+   - Tie-breaker for tests-green/prod-red: existing test calls real function on failing input and still passes, that's design-level (test/prod divergence), route [plan](../plan/SKILL.md); existing test never calls failing input (missing edge), that's logic bug, route `tdd`. Concurrency: race on shared field fixed by local synchronization plus missing concurrent test, logic bug, route `tdd`; race requiring declaring shared service thread-safe across callers, design-level, name wrong contract.
 
 **Done when:** one root cause named at `file:line` with one-sentence why, surviving skeptic dispatch cited, caller graph checked, classified as logic (default) or design-level (with wrong contract named).
 
 ## Step 5: Route the Fix
 
 1. **Logic bug, route `tdd`:** hand over minimal repro with verbatim failing output as RED test; `tdd` drives RED-GREEN-REFACTOR for fix.
-2. **Design-level failure, route `request-plan`:** re-draft affected scope, then `receive-plan` validates, then `dispatch-agents`/`tdd` executes.
+2. **Design-level failure, route `plan`:** re-draft affected scope, then `plan` (validate mode) validates, then `dispatch-agents`/`tdd` executes.
 3. **Root cause dead or unused code:** propose deletion (with `git grep` proving no callers), not patch.
 4. Delete the `.state-debugging-<slug>.md` checkpoint file on route-out (any of items 1–3 above).
 
 HARD GATE applies (see Strict Rules): route root cause and repro; don't prescribe patch. Invoke sibling skill and stop.
 
-**Done when:** fix handed to `tdd` (logic bug, minimal repro + verbatim output as RED) or `request-plan` (design-level, wrong contract named), or deletion proposed with proof of no callers.
+**Done when:** fix handed to `tdd` (logic bug, minimal repro + verbatim output as RED) or `plan` (design-level, wrong contract named), or deletion proposed with proof of no callers.
 
 ## Strict Rules
 
@@ -103,5 +103,5 @@ HARD GATE applies (see Strict Rules): route root cause and repro; don't prescrib
 | Skill                                                  | Use Case                                                                                                   |
 | :----------------------------------------------------- | :--------------------------------------------------------------------------------------------------------- |
 | [tdd](../tdd/SKILL.md)                                 | Fix isolated logic bug — minimal repro (with verbatim output) is RED test                                  |
-| [request-plan](../request-plan/SKILL.md)               | Design-level failure needing architecture/contract change                                                  |
-| [receive-code-review](../receive-code-review/SKILL.md) | Existing review feedback flagged design-level concern — resolve here, then request-plan if re-draft needed |
+| [plan](../plan/SKILL.md)                               | Design-level failure needing architecture/contract change                                                  |
+| [review](../review/SKILL.md)                           | Existing review feedback flagged design-level concern — resolve here, then [plan](../plan/SKILL.md) if re-draft needed |

@@ -2,11 +2,11 @@
 
 ![Version](https://img.shields.io/github/package-json/v/j0hanz/squads?style=for-the-badge&label=version)
 
-A multi-agent workflow plugin with six skills that hand off along one lifecycle.
+A multi-agent workflow plugin with seven skills that hand off along one lifecycle.
 
 ## Features
 
-Six skills, each with a single job, that hand off along one lifecycle:
+Seven skills, each with a single job, that hand off along one lifecycle:
 
 - **parallel-brainstorming**: explore a vague or open problem before any plan exists.
 - **plan**: draft a plan or spec, then validate it before execution (draft / validate modes).
@@ -14,6 +14,7 @@ Six skills, each with a single job, that hand off along one lifecycle:
 - **tdd**: implement new logic test-first; flags tests written after the code.
 - **parallel-debugging**: reproduce and isolate an unexpected failure before fixing it.
 - **review**: get a fresh-eye review on a diff, then resolve the feedback (request / resolve modes).
+- **forge-workflow**: forge a reusable dynamic workflow from an approved plan (generates per-project `.claude/workflows/<name>.js` + `docs/workflows/CATALOG.md`; never shipped with the plugin).
 
 ## Install
 
@@ -47,8 +48,11 @@ user request → dispatch-agents (Step 0 Triage: pick workflow + fleet)
   │                                                  └→ dispatch-agents (multi-task) / tdd (single task)
   ├─ failure       → parallel-debugging → tdd (logic bug) / plan (design-level)
   ├─ bulk / audit  → dispatch-agents patterns (fan out, adversarial verify, loop until done)
+  ├─ approved plan → forge-workflow (forge/library branch: generates per-project `.claude/workflows/<name>.js` + `docs/workflows/CATALOG.md`, never shipped)
   └─ verified diff → review (request) → review (resolve) → commit / PR
 ```
+
+> **Platform requirement**: native dynamic workflows are a hard dependency — Claude Code (CC) ≥ 2.1.154, paid plan required.
 
 ## License
 

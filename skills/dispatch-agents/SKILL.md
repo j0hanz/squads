@@ -10,15 +10,15 @@ argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 
 Every incoming task/request starts here. Classify it (first match win), route to workflow, decide fleet shape — never start building, planning, fixing before triage.
 
-| Incoming request                                                                       | Workflow                                                                         | Fleet decision                                                                                                                                                                                                                                         |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Vague requirements, open solution space, ≥2 distinct architectural approaches          | [parallel-brainstorming](../parallel-brainstorming/SKILL.md)                     | None — ideation phases forbid subagents                                                                                                                                                                                                                |
-| Clear feature or change needing a plan or spec                                         | [plan](../plan/SKILL.md) (draft → validate modes)                                | Ideators by depth (sketch 0 / contract 2 / blueprint 3) + 1 critic (contract) / 3 per-lens critics (blueprint) — sketch skips validate, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per plan Step 5 |
-| APPROVED `docs/plan/*.plan.md` in hand                                                 | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md) | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                               |
-| Single new logic behavior, no plan needed, or TDD red flag                             | [tdd](../tdd/SKILL.md)                                                           | One worker; review supply fresh eyes                                                                                                                                                                                                                   |
-| Test, `Validate:` command, or runtime fail unexpectedly — before any fix               | [parallel-debugging](../parallel-debugging/SKILL.md)                             | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                       |
-| Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve | [review](../review/SKILL.md) (request / resolve modes)                           | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                     |
-| Bulk independent items, whole-repo audit, or unbiased judging of this context's work   | Patterns (below)                                                                 | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                 |
+| Incoming request                                                                       | Workflow                                                                            | Fleet decision                                                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Vague requirements, open solution space, ≥2 distinct architectural approaches          | [parallel-brainstorming](../parallel-brainstorming/SKILL.md)                        | None — ideation phases forbid subagents                                                                                                                                                                                                                |
+| Clear feature or change needing a plan or spec                                         | [plan](../plan/SKILL.md) (draft → validate modes)                                   | Ideators by depth (sketch 0 / contract 2 / blueprint 3) + 1 critic (contract) / 3 per-lens critics (blueprint) — sketch skips validate, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per plan Step 5 |
+| APPROVED `docs/plan/*.plan.md` in hand                                                 | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                               |
+| Single new logic behavior, no plan needed, or TDD red flag                             | [tdd](../tdd/SKILL.md)                                                              | One worker; review supply fresh eyes                                                                                                                                                                                                                   |
+| Test, `Validate:` command, or runtime fail unexpectedly — before any fix               | [parallel-debugging](../parallel-debugging/SKILL.md)                                | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                       |
+| Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                     |
+| Bulk independent items, whole-repo audit, or unbiased judging of this context's work   | [forge-workflow](../forge-workflow/SKILL.md) (generate a native `/<name>` workflow) | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                 |
 
 Two rows fit? Earlier wins: ideation before planning, planning before execution, bug before its fix. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiplies token cost.
 
@@ -61,34 +61,7 @@ artifacts: [absolute paths written]
 
 **State-carrier precedence:** if a `docs/plan/*.plan.md` file exists for the work, state is carried as plan-header lines `Review pass: N` and `Origin: <skill|human>`, written only by the main thread; with no plan file, state stays in-conversation (current behavior, sanctioned for planless single-session flows). A missing `Review pass:` line means pass 1.
 
-## Patterns
-
-Pick first fit; compose when task demands it.
-
-| Pattern                  | Shape                                                                                                              | Use when                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| **Fan out & synthesize** | One agent per independent chunk → barrier → merge with provenance                                                  | Research, audits, due diligence, per-file/per-folder sweeps |
-| **Adversarial verify**   | 2+ fresh skeptics per finding, prompted to _refute_ it; quorum table below determines outcome                      | Any finding or claim about to be acted on or shipped        |
-| **Generate & filter**    | One agent overgenerates (40+, not 5) → separate judge scores against rubric                                        | Taste bottlenecks: names, titles, bulk candidate sets       |
-| **Tournament**           | Pairwise fresh-context matches, winners advance bracket-style                                                      | Ranking large sets without one bloated, biased context      |
-| **Classify & act**       | Cheap classifier routes each item to its handler; dedupe before acting                                             | Mixed-type inboxes, triage, heterogeneous queues            |
-| **Loop until done**      | Keep dispatching rounds until condition holds — stop on 2 consecutive empty rounds OR absolute ceiling (see below) | Flaky bugs, unknown-size discovery                          |
-
-**Adversarial verify — quorum table:**
-
-| Skeptics | Finding dies when | Tie-break     |
-| -------- | ----------------- | ------------- |
-| 2        | ≥ 1 refutes       | Add 1 skeptic |
-| 3        | ≥ 2 refute        | N/A           |
-| 4+       | > 50% refute      | N/A           |
-
-Abstain counts as 0.5 refutation toward threshold. A finding not actively confirmed by at least one skeptic is treated as unverified (PARTIAL, not PASS).
-
-**Loop until done — absolute ceiling:** `ceil(N / 2)` total rounds where N = initial item count, minimum 4. Additionally: if 3 consecutive rounds each yield only 1 new item, stop (diminishing-returns signal). Log every round; silence ≠ convergence.
-
-Exploring _design approaches_ isn't Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there, ideation phases forbid subagents.
-
-Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
+Pattern shapes, quorum, and loop ceilings live in [forge-workflow](../forge-workflow/SKILL.md#pattern-canon) — cite, don't duplicate.
 
 ### Model tier
 

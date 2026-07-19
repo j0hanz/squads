@@ -29,7 +29,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 
 ## Usage
 
-On every session start, clear, and compact, the `squads-router` block (inlined as a literal string in `hooks/session-start.sh`) is injected automatically and routes each task through `dispatch-agents`, whose triage step selects the right workflow by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
+On every session start, clear, and compact, the `squads-router` block (inlined as a literal string in `hooks/session-start.sh`) is injected automatically and routes each task through `dispatch-agents`, whose Governor selects the right workflow by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
 
 ```text
 /squads:parallel-brainstorming  "add offline mode to the editor"
@@ -37,12 +37,12 @@ On every session start, clear, and compact, the `squads-router` block (inlined a
 /squads:tdd                    "parse a duration string into seconds"
 ```
 
-When unsure which skill fits, invoke `dispatch-agents` — its triage picks for you, preferring upstream (brainstorm or plan) over executing or reviewing.
+When unsure which skill fits, invoke `dispatch-agents` — its Governor picks for you, preferring upstream (brainstorm or plan) over executing or reviewing.
 
 ### Lifecycle
 
 ```text
-user request → dispatch-agents (Step 0 Triage: pick workflow + fleet)
+user request → dispatch-agents (Governor: pick workflow + fleet)
   ├─ open problem  → parallel-brainstorming → plan (draft) → plan (validate) ─┐
   ├─ clear feature → plan (draft) → plan (validate) ─┬────────────────────────┘
   │                                                  └→ dispatch-agents (multi-task) / tdd (single task)

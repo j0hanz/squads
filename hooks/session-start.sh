@@ -10,7 +10,7 @@ if ! command -v jq >/dev/null 2>&1; then
   echo
 fi
 
-router='Route every incoming task or user request to [dispatch-agents](../dispatch-agents/SKILL.md); its Step 0 Triage classifies the request (first match wins) and picks the workflow + fleet shape. Skip only for pure conversation or a one-shot edit answerable direct.'
+router='Route every incoming task or user request to [dispatch-agents](../dispatch-agents/SKILL.md); its Step 0 Governor classifies the request (first match wins) and picks the workflow + fleet shape. Skip only for pure conversation or a one-shot edit answerable direct.'
 
 if grep -qF -e '<squads-router>' -e '</squads-router>' -e '<system-reminder' <<<"$router"; then
   echo 'squads: refusing to inject router content containing reserved sentinels' >&2

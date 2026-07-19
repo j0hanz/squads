@@ -92,3 +92,15 @@ For multi-milestone implementation work, use three roles:
 3. **Validators** — who never saw code — check each milestone twice: static scrutiny (tests, types, lint, review) and behavior (actually exercise running thing end-to-end).
 
 **Done when:** each milestone passes both static and behavior validation; failing milestone routes to parallel-debugging (impl bug) or request-plan (plan error).
+
+## Next Skills
+
+| Skill                                                  | Use Case                                                                  |
+| :----------------------------------------------------- | :------------------------------------------------------------------------ |
+| [parallel-brainstorming](../parallel-brainstorming/SKILL.md) | Vague requirements, open solution space, ≥2 architectural approaches |
+| [request-plan](../request-plan/SKILL.md)               | Clear feature or change needing a plan or spec                          |
+| [receive-plan](../receive-plan/SKILL.md)               | Validate an existing plan/specs pair (contract/blueprint)              |
+| [tdd](../tdd/SKILL.md)                                 | Single new logic behavior, or a TDD red flag                            |
+| [parallel-debugging](../parallel-debugging/SKILL.md)   | Test, `Validate:`, or runtime fail unexpectedly — before any fix        |
+| [request-code-review](../request-code-review/SKILL.md) | Verified diff awaiting a fresh-eye review                             |
+| [receive-code-review](../receive-code-review/SKILL.md) | Resolve review feedback (human, bot, or subagent)                       |

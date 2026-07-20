@@ -181,14 +181,32 @@ def _load_project_synonyms(cwd: Path) -> dict[str, list[str]]:
         return {}
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"warning: synonyms.json unreadable ({exc}); synonyms ignored", file=sys.stderr)
         return {}
     if not isinstance(raw, dict):
+        print("warning: synonyms.json is not a JSON object; synonyms ignored", file=sys.stderr)
         return {}
     result: dict[str, list[str]] = {}
     for key, value in raw.items():
         if isinstance(key, str) and isinstance(value, list):
-            clean_syns = [s for s in value if isinstance(s, str)]
+            clean_syns = []
+            for s in value:
+                if not isinstance(s, str):
+                    continue
+                cleaned = re.sub(r"[^A-Za-z0-9-]", "", s)
+                if not cleaned or cleaned.startswith("-"):
+                    print(
+                        f"warning: dropped synonym {s!r} (empty or flag-like after sanitization)",
+                        file=sys.stderr,
+                    )
+                    continue
+                if cleaned != s:
+                    print(
+                        f"warning: sanitized synonym {s!r} → {cleaned!r} (non-alphanumeric chars stripped)",
+                        file=sys.stderr,
+                    )
+                clean_syns.append(cleaned)
             if clean_syns:
                 result[key.lower()] = clean_syns
     return result

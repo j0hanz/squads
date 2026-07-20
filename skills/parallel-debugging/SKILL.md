@@ -63,9 +63,9 @@ The `debug-verify` script enforces all guardrails in-code:
 - **read-only investigators** — one per hypothesis, blind to each other; every stage prompt denies write/edit tools.
 - **in-code bare-claim truncation** — each finding truncated to `root cause is <X> at <file:line>, classified as <logic|design-level>` before skeptics read it; claims lacking the `(file:line, classification)` tuple are dropped.
 - **skeptics with distinct angles** — 2+ fresh skeptics per claim, prompted to _refute_ (one attacks the repro, one the caller-graph, one the classification).
-- **canonical quorum tally** — per forge-workflow's Pattern Canon (2 skeptics → dies if ≥1 refutes; 3 → ≥2 refute; 4+ → >50% refute; abstain = 0.5 refutation toward threshold).
+- **canonical quorum tally** — per [forge-workflow's Pattern Canon](../forge-workflow/SKILL.md#pattern-canon) quorum table, including its PARTIAL-when-unconfirmed rule (a finding not actively confirmed by a skeptic is unverified, not PASS).
 - **`(file:line, classification)` dedupe** — across rounds, against everything seen (including refuted hypotheses).
-- **stop on 2 consecutive no-survivor rounds or ceiling** — `ceil(N/2)` total rounds where N = initial hypothesis count, minimum 4.
+- **stop on 2 consecutive no-survivor rounds or ceiling** — `ceil(N/2)` total rounds where N = initial hypothesis count, minimum 4. (The generic "loop until done" pattern stops on dedupe-empty "nothing new" rounds; debug-verify's fixed-hypothesis variant stops on "no-survivor" rounds instead — see [Pattern Canon](../forge-workflow/SKILL.md#pattern-canon).)
 - **returns round log + survivors + refutation trail** in [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) shape.
 
 **Done when:** `debug-verify` returns a Handoff Contract with round log, survivors (each carrying refutation-responses), and refutation trail; or loop-back stop condition met and user escalated.

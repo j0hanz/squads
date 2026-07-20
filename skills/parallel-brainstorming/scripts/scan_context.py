@@ -181,14 +181,32 @@ def _load_project_synonyms(cwd: Path) -> dict[str, list[str]]:
         return {}
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except OSError, json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"warning: synonyms.json unreadable ({exc}); synonyms ignored", file=sys.stderr)
         return {}
     if not isinstance(raw, dict):
+        print("warning: synonyms.json is not a JSON object; synonyms ignored", file=sys.stderr)
         return {}
     result: dict[str, list[str]] = {}
     for key, value in raw.items():
         if isinstance(key, str) and isinstance(value, list):
-            clean_syns = [s for s in value if isinstance(s, str)]
+            clean_syns = []
+            for s in value:
+                if not isinstance(s, str):
+                    continue
+                cleaned = re.sub(r"[^A-Za-z0-9-]", "", s)
+                if not cleaned or cleaned.startswith("-"):
+                    print(
+                        f"warning: dropped synonym {s!r} (empty or flag-like after sanitization)",
+                        file=sys.stderr,
+                    )
+                    continue
+                if cleaned != s:
+                    print(
+                        f"warning: sanitized synonym {s!r} → {cleaned!r} (non-alphanumeric chars stripped)",
+                        file=sys.stderr,
+                    )
+                clean_syns.append(cleaned)
             if clean_syns:
                 result[key.lower()] = clean_syns
     return result
@@ -342,7 +360,8 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
         test_root = cwd / root_name
         if not test_root.is_dir():
             continue
-        for dirpath, _, filenames in os.walk(test_root):
+        for dirpath, dirs, filenames in os.walk(test_root):
+            dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
             for pattern in _test_name_patterns:
                 if pattern in filenames:
                     found = Path(dirpath) / pattern
@@ -517,8 +536,9 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     total_matched = len(result.related_files)
     matched_modules = {
         Path(f.path).parts[0]
-        for f in result.related_files
         if len(Path(f.path).parts) > 1
+        else "<root>"
+        for f in result.related_files
     }
 
     # Cap to _MAX_FILES most relevant files

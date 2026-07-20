@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate",
+  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry (exec-form). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated — see docs/design/2026-07-20-squads-hooks-redesign-design.md.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-start.sh\"",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "session-start"],
             "timeout": 5
           }
         ]
@@ -15,22 +16,71 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task|Agent|SendMessage|Workflow",
+        "matcher": "Agent|SendMessage|Workflow",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/dispatch-check.sh\"",
-            "timeout": 10
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "dispatch-check"],
+            "timeout": 30
           }
         ]
       },
       {
-        "matcher": "Skill|Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Skill|Write|Edit|MultiEdit|NotebookEdit|Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/debug-gate.sh\"",
-            "timeout": 10
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "debug-gate"],
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "tdd-gate"],
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "plan-schema"],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "tdd-arm"],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "return-shape"],
+            "timeout": 30
           }
         ]
       }
@@ -40,7 +90,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/session-end.sh\"",
+            "command": "bash",
+            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "session-end"],
             "timeout": 5
           }
         ]

@@ -25,11 +25,11 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or runtime dependency; the plugin is markdown skills plus one Node hook.
+> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, exec-form `hooks/hooks.json`, 30s PreToolUse timeout). Note: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.
 
 ## Usage
 
-On every session start, clear, and compact, the `squads-router` block (inlined as a literal string in `hooks/session-start.sh`) is injected automatically and routes each task through `dispatch-agents`, whose Governor selects the right workflow by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
+On every session start, clear, and compact, the `squads-router` block (inlined as a literal string in the `session-start` arm of `hooks/squads-hook.sh`) is injected automatically and routes each task through `dispatch-agents`, whose Governor selects the right workflow by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
 
 ```text
 /squads:parallel-brainstorming  "add offline mode to the editor"

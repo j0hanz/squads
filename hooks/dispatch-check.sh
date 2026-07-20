@@ -37,6 +37,16 @@ surface=$(awk '
   !in_uc
 ' <<<"$prompt")
 
+# Fail-closed on an unbalanced <untrusted_context> wrapper: an unclosed open
+# tag would make awk strip every following line from $surface, bypassing the
+# sentinel check, while the raw $prompt still contains the tag and skips the
+# raw-diff check. Deny instead of letting one malformed wrapper defeat both.
+opens=$(grep -cE '^<untrusted_context>[[:space:]]*$' <<<"$prompt" || true)
+closes=$(grep -cE '^<\/untrusted_context>[[:space:]]*$' <<<"$prompt" || true)
+if (( opens != closes )); then
+  deny "dispatch prompt has an unbalanced <untrusted_context> wrapper ($opens open, $closes close) — fix the wrapper or remove it."
+fi
+
 placeholders=$(grep -oE '\{\{[^{}]*\}\}' <<<"$surface" | sort -u | awk 'NR > 1 { printf ", " } { printf "%s", $0 }')
 if [[ -n "$placeholders" ]]; then
   deny "dispatch prompt contains unresolved placeholder(s) $placeholders — replace every {{...}} with real values before dispatching (review: No unresolved placeholders reach subagent)."

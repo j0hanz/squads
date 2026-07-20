@@ -12,7 +12,7 @@ argument-hint: '[feature request or problem to explore]'
 
 This skill uses `Phase 1-6` — phases, not steps, because ideation is a cyclic loop (checkpoint + REVISE loop-back) rather than a one-way path.
 
-1 → (2 if ambiguous) → Creative Checkpoint → 3 → 4 → (5 if flagged: APPROVED → 6, REVISE → loop in 5, REJECT → 3 or stop) → 6
+1 → (2 if ambiguous) → Creative Checkpoint → 3 → 4 → (5 if flagged or stress-test requested: APPROVED → 6, REVISE → loop in 5, REJECT → 3 or stop) → 6
 
 ## Phase 1: Framing & Discovery
 
@@ -59,7 +59,7 @@ This skill uses `Phase 1-6` — phases, not steps, because ideation is a cyclic 
 
 - **Output (per approach):** Idea, core mechanism, winning factor, key risk, first step.
 
-**Done when:** approaches generated in one response (one Minimalist), each with idea, core mechanism, winning factor, key risk, first step; count per line 50.
+**Done when:** approaches generated in one response (one Minimalist), each with idea, core mechanism, winning factor, key risk, first step; count per Scope (line 50).
 
 ## Phase 4: Convergence & Synthesis
 
@@ -120,7 +120,7 @@ Request: "add a way for users to save and re-run searches."
 ## Strict Rules
 
 - **No Blended Ideation:** Keep Phase 3 perspective distinct; don't bleed into each other till Phase 4 synthesis.
-- **No Agent-tool subagents for Phase 3 or 5.**
+- **No Agent-tool subagents in any phase.**
 
 ## Next Skills
 

@@ -42,7 +42,7 @@ Consulted only once mode = inline. Classify the request (first match wins), rout
 | Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                     |
 | Bulk independent items, whole-repo audit, or unbiased judging of this context's work   | [forge-workflow](../forge-workflow/SKILL.md) (generate a native `/<name>` workflow) | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                 |
 
-Two rows fit? Earlier wins: ideation before planning, planning before execution, bug before its fix. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiplies token cost.
+Two rows fit? Earlier wins by lifecycle: ideation before planning, planning before execution. A failure is reproduced (parallel-debugging) before it is fixed (tdd), regardless of row order. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiplies token cost.
 
 ### Governor output struct
 

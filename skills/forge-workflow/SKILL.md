@@ -16,7 +16,7 @@ Every generated script embeds these six invariants. They are mechanical, not pro
 
 2. **In-script bare-claim truncation between generator and skeptic.** Between the generator stage and the skeptic stage, the script truncates each candidate claim to a one-line bare form — `root cause is <X> at <file:line>, classified as <logic|design-level>` for debug-verify, or `<claim> at <file:line>, classified as <class>` elsewhere. Any claim lacking the `(file:line, classification)` tuple is truncated or dropped before the skeptic reads it. Smuggling the generator's reasoning into the claim defeats judge ≠ generator while satisfying every literal rule; truncation in code, not in prompt, is the enforcement.
 
-3. **Each `agent()` call's `schema` mirrors the Handoff Contract fields.** Every `agent()` invocation declares a `schema` with exactly the six keys of the [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract): `status/completed/skipped/findings/commands/artifacts`. A return missing `status` or `findings` is treated as FAIL — discard, retry once, then route to parallel-debugging. No ad-hoc return shapes.
+3. **Each `agent()` call's `schema` mirrors the Handoff Contract fields.** Every `agent()` invocation declares a `schema` with exactly the six keys of the [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract): `status/completed/skipped/findings/commands/artifacts`. The FAIL rule for a return missing `status` or `findings` is defined at the source — cite, don't duplicate. No ad-hoc return shapes.
 
 4. **`args` parameterization with declared defaults.** Every workflow reads an `args` object at the top and declares a default for every field. Smoke-slice runs the same script with a small `args`; production scales by overriding `args` only. No hardcoded counts, prompts, or paths in stage bodies — all parameterized.
 
@@ -51,13 +51,13 @@ Abstain counts as 0.5 refutation toward threshold. A finding not actively confir
 
 **Loop until done — absolute ceiling:** `ceil(N / 2)` total rounds where N = initial item count, minimum 4. Additionally: if 3 consecutive rounds each yield only 1 new item, stop (diminishing-returns signal). Log every round; silence ≠ convergence.
 
-Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new**. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
+Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new** (dedupe-empty). The adversarial-verify variant used by `debug-verify` instead stops on 2 consecutive **no-survivor** rounds (all claims refuted), since its hypotheses are fixed at invocation. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
 
 Exploring _design approaches_ isn't a Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there; ideation phases forbid subagents.
 
 ## Recipe Catalog
 
-Each recipe maps an archetype to a composition, a default agent scale, an `args` signature with defaults, and a fetch-or-edit class. A generated workflow is either fetch-class (agents may fetch external content, wrapped in `<untrusted_context>`) OR edit-class (agents may edit files), never both. Read-only class (below) is neither. Recipes duplicating a lifecycle mandate (plan draft/validate, tdd RED-GREEN, review 2-pass) are rejected at forge time.
+Each recipe maps an archetype to a composition, a default agent scale, an `args` signature with defaults, and a fetch-or-edit class. A generated workflow is fetch-class, edit-class, or read-only class. Fetch-class and edit-class are mutually exclusive (never both); read-only class is neither — see below. Recipes duplicating a lifecycle mandate (plan draft/validate, tdd RED-GREEN, review 2-pass) are rejected at forge time.
 
 | Recipe               | Composition                                                         | Default scale              | `args` signature                                      | Class     |
 | -------------------- | ------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------- | --------- |
@@ -69,11 +69,11 @@ Each recipe maps an archetype to a composition, a default agent scale, an `args`
 | `loop-until-done`    | rounds of fan-out → dedupe by `file:line` → ceiling                 | 4 rounds, 5 agents/round   | `{seed, rubric, max_rounds?}`                         | read-only |
 | `debug-verify`       | per-hyp investigators → bare-claim trunc → skeptics → quorum → loop | N hypotheses × 2 skeptics  | `{hypotheses: [], repro_cmd, failing_output, rubric}` | read-only |
 
-**`debug-verify`** is consumed by [parallel-debugging](../parallel-debugging/SKILL.md) for the Steps 2–3 collapse (slice 3 of the workflow-generation design): investigators spawn one per hypothesis (blind), the script truncates each finding to `root cause is <X> at <file:line>, classified as <logic|design-level>` in code before skeptics read it, skeptics spawn with distinct refutation angles per claim, the canonical quorum table tallies each round, loops dedupe by `(file:line, classification)`, stop on 2 consecutive no-survivor rounds or the ceiling, and return round log + survivors + refutation trail in [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) shape. It is strictly read-only class — see below.
+**`debug-verify`** is consumed by [parallel-debugging](../parallel-debugging/SKILL.md) at its Step 2 (invoke debug-verify): investigators spawn one per hypothesis (blind), the script truncates each finding to `root cause is <X> at <file:line>, classified as <logic|design-level>` in code before skeptics read it, skeptics spawn with distinct refutation angles per claim, the canonical quorum table tallies each round, loops dedupe by `(file:line, classification)`, stop on 2 consecutive no-survivor rounds or the ceiling, and return round log + survivors + refutation trail in [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) shape. It is strictly read-only class — see below.
 
 ### Read-only class
 
-A recipe is **read-only class** when no stage's `agent()` prompt permits file writes or edits, and no stage fetches external content. The `debug-verify` recipe is read-only class by definition: runtime agents run with `acceptEdits` and hooks do not fire inside the runtime, so a drifted generation that let an agent edit code mid-debug would bypass the debug-gate. The read-only class compensates: script audit (TASK-002) verifies every stage prompt denies write/edit tools before save, and `debug-gate.sh` still blocks main-thread edits regardless. Read-only-class recipes are safe to smoke-slice and re-run — bounded cost, no state mutation.
+A recipe is **read-only class** when no stage's `agent()` prompt permits file writes or edits, and no stage fetches external content. The `debug-verify` recipe is read-only class by definition: runtime agents run with `acceptEdits` and hooks do not fire inside the runtime, so a drifted generation that let an agent edit code mid-debug would bypass the debug-gate. The read-only class compensates: the Script Audit Checklist's no-write clause verifies every stage prompt denies write/edit tools before save, and `debug-gate.sh` still blocks main-thread edits regardless. Read-only-class recipes are safe to smoke-slice and re-run — bounded cost, no state mutation.
 
 ## Next Skills
 

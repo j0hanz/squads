@@ -12,13 +12,13 @@ Every incoming task/request starts here. The Governor gates on a preflight, deci
 
 ### Preflight (first gate)
 
-Native dynamic workflows are a platform hard-dependency for composed mode. Check, in order: Claude Code version ≥ **2.1.154**, AND a paid plan, AND dynamic workflows not disabled. If any fail, composition is OFF — the Governor routes inline only, no silent degrade inside forge.
+Native dynamic workflows are a platform hard-dependency for composed mode. Check the preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight). If any fail, composition is OFF — the Governor routes inline only, no silent degrade inside forge.
 
 ### Governor Threshold Table (first-match, decides mode)
 
 | Signal                                                                                                                       | → mode / class                                        |
 | ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Preflight fails (CC < 2.1.154 / not paid / disabled)                                                                         | composed OFF; inline only                             |
+| Preflight fails (see §Preflight above)                                                                                       | composed OFF; inline only                             |
 | Explicit "make/build a workflow"                                                                                             | composed                                              |
 | Lifecycle match (failure→debug · diff/feedback→review · feature→plan · vague/≥2 approaches→brainstorm · single behavior→tdd) | inline                                                |
 | Bulk: keyword {audit, every, all, across, each} AND independent items ≥ 5                                                    | composed                                              |

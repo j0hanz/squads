@@ -15,7 +15,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Task|Agent|SendMessage",
+        "matcher": "Task|Agent|SendMessage|Workflow",
         "hooks": [
           {
             "type": "command",

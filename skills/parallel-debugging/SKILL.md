@@ -52,7 +52,7 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 
 ## Step 2: Invoke debug-verify
 
-**Preflight** (once per session): assert native dynamic workflows available; abort with a clear message if not. **No fallback** — do not degrade to turn-by-turn Agent dispatches; the in-script truncation, quorum tally, and agent-count cap are unenforceable outside the runtime.
+**Preflight** (once per session): assert the composed-mode preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight); abort with a clear message if not. **No fallback** — do not degrade to turn-by-turn Agent dispatches; the in-script truncation, quorum tally, and agent-count cap are unenforceable outside the runtime.
 
 Enumerate distinct root-cause hypotheses (from repro, stack trace, failing function's callers), then invoke forge-workflow's `debug-verify` recipe with `args={hypotheses[], repro_cmd, failing_output, rubric}`. The recipe is strictly [read-only class](../forge-workflow/SKILL.md#read-only-class) — runtime agents run `acceptEdits` and the read-only class compensates; `hooks/debug-gate.sh` still blocks main-thread edits regardless.
 

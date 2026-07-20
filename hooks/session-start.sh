@@ -22,3 +22,15 @@ echo
 echo '<squads-router>'
 printf '%s\n' "$router"
 echo '</squads-router>'
+
+# Composed-mode preflight reminder — a session banner holding the literal
+# condition (DRY is skill-prose-only; this is a hook banner, not skill prose).
+# Routed through its OWN sentinel-rejection guard — it does not ride on the
+# router guard above; two distinct guard call sites.
+reminder='Composed-mode preflight (Governor checks at dispatch): Claude Code >= 2.1.154, paid plan, dynamic workflows not disabled — else composed OFF, inline only.'
+
+if grep -qF -e '<squads-router>' -e '</squads-router>' -e '<system-reminder' <<<"$reminder"; then
+  echo 'squads: refusing to inject reminder containing reserved sentinels' >&2
+else
+  printf '%s\n' "$reminder"
+fi

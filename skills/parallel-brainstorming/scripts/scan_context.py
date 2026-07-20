@@ -360,7 +360,8 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
         test_root = cwd / root_name
         if not test_root.is_dir():
             continue
-        for dirpath, _, filenames in os.walk(test_root):
+        for dirpath, dirs, filenames in os.walk(test_root):
+            dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
             for pattern in _test_name_patterns:
                 if pattern in filenames:
                     found = Path(dirpath) / pattern

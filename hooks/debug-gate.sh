@@ -8,12 +8,16 @@
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
+  # Without jq the hook cannot parse tool_input to apply file-path exemptions,
+  # so it fails closed rather than let edits through unfiltered.
   echo "squads debug-gate: jq not found — gate cannot run. Install jq (Windows: winget install jqlang.jq). Edits blocked while jq is missing." >&2
   exit 2
 fi
 
 input=$(cat)
-tool=$(jq -r '.tool_name // empty' <<<"$input" 2>/dev/null) || exit 0
+# Fail-closed on malformed JSON: consistent with dispatch-check.sh, so a
+# corrupt payload cannot silently bypass the HARD GATE.
+tool=$(jq -r '.tool_name // empty' <<<"$input" 2>/dev/null) || exit 2
 session_id=$(jq -r '.session_id // "unknown"' <<<"$input" | tr -cd 'a-zA-Z0-9-')
 flag="${TMPDIR:-/tmp}/squads-debug-gate-${session_id:-unknown}"
 
@@ -35,7 +39,7 @@ case "$tool" in
     esac
     ;;
 
-  Write | Edit | NotebookEdit)
+  Write | Edit | MultiEdit | NotebookEdit)
     [[ -f "$flag" ]] || exit 0
 
     if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
@@ -43,13 +47,13 @@ case "$tool" in
       exit 0
     fi
 
-    file_path=$(jq -r '.tool_input.file_path // empty' <<<"$input")
+    file_path=$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")
     base=$(basename "${file_path//\\//}")
     case "$base" in
       # Exempt markdown + genuine test/spec files only. Anchor "test"/"spec"
       # as a delimited token (start, end, or beside _ . -) so production files
       # like latest.js / inspect.js / special.py / contest.go are NOT exempted.
-      *.md) exit 0 ;;
+      *.md | *.MD) exit 0 ;;
       test_* | *_test | *_test.* | *.test.* | *.test | \
       *_spec | *_spec.* | *.spec.* | *.spec | \
       *Test | *Test.* | *Spec | *Spec.* | \

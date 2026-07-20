@@ -3,7 +3,7 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|clear|compact",
+        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
@@ -25,7 +25,7 @@
         ]
       },
       {
-        "matcher": "Skill|Write|Edit|NotebookEdit",
+        "matcher": "Skill|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",

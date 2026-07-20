@@ -6,16 +6,14 @@ set -uo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0 # no jq -> guards never wrote state
 
-# Read hook input once; jq consumes stdin. Fail-safe: missing fields -> "unknown".
+# Read hook input once; jq consumes stdin. Sanitize the id once and reuse it.
 input=$(cat)
-m_sid=$(printf '%s' "$input" | jq -r '.session_id // "unknown"' 2>/dev/null)
-m_reason=$(printf '%s' "$input" | jq -r '.reason // "unknown"' 2>/dev/null)
-printf 'squads session-end: %s reason=%s\n' "$m_sid" "$m_reason"
-
 session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null | tr -cd 'a-zA-Z0-9-')
-# Empty id -> bail. Never glob without the id: that would delete other
-# sessions' state. Fallback-named files ("unknown"/"no-session-id") are
-# left to the 120-minute expiry.
+reason=$(printf '%s' "$input" | jq -r '.reason // "unknown"' 2>/dev/null)
+printf 'squads session-end: %s reason=%s\n' "$session_id" "$reason"
+
+# Empty id bails because the glob is a no-op: it yields a literal double-dash
+# prefix matching neither other sessions nor the no-session-id fallback.
 [[ -n "$session_id" ]] || exit 0
 
 tmp="${TMPDIR:-/tmp}"

@@ -13,8 +13,8 @@
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo 'squads dispatch-check: jq not found — dispatch guard skipped' >&2
-  exit 0
+  echo "squads dispatch-check: jq not found — guard cannot run. Install jq (Windows: winget install jqlang.jq) and retry. Dispatch blocked." >&2
+  exit 2
 fi
 
 deny() {

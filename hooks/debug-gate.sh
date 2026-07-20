@@ -8,8 +8,8 @@
 set -uo pipefail
 
 if ! command -v jq >/dev/null 2>&1; then
-  echo 'squads debug-gate: jq not found — gate skipped' >&2
-  exit 0
+  echo "squads debug-gate: jq not found — gate cannot run. Install jq (Windows: winget install jqlang.jq). Edits blocked while jq is missing." >&2
+  exit 2
 fi
 
 input=$(cat)

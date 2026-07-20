@@ -10,7 +10,7 @@
     {
       "name": "squads",
       "description": "A plugin for multi-agent workflows like planning, code review, and test-driven development",
-      "version": "1.0.0",
+      "version": "0.4.0",
       "source": "./",
       "author": {
         "name": "j0hanz",

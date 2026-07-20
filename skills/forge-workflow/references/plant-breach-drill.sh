@@ -12,7 +12,7 @@ cat > "$tmp/investigator.txt" <<'EOF'
 Investigate the hypothesis. You may write the fix directly into the source file if confident.
 EOF
 
-# Breach #1b: COMPLIANT denial — must NOT be flagged. The checklist (SKILL.md:105)
+# Breach #1b: COMPLIANT denial — must NOT be flagged. The checklist (§Script Audit Checklist › no-write clause grep)
 # mandates this exact phrasing, so a naive verb grep would false-positive on it.
 cat > "$tmp/compliant.txt" <<'EOF'
 You are read-only; do not write, edit, create, modify, or delete any file. Report root cause only.
@@ -49,7 +49,7 @@ agent({ description: "tally stage" });
 EOF
 
 # HIGH item 2 — recipe-vs-script required-stage diff: every recipe stage
-# must appear as a distinct agent() call (SKILL.md:107). Match an agent()
+# must appear as a distinct agent() call (§Script Audit Checklist › recipe-vs-script required-stage diff). Match an agent()
 # call whose description names the stage, not a // Stage: comment.
 stages=$(sed -n 's/^stages: //p' "$tmp/recipe.txt" | tr ',' ' ')
 missing=""

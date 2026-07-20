@@ -24,6 +24,7 @@ Fresh-eye review of a verified diff before merge.
    - **Committed** (target is branch, commit, or path):
      1. Classify target → `head`. `git rev-parse --verify <target>` succeeds → branch/commit (`head=<target>`); else path (`head=HEAD`, append `-- <target>` to the diff in step 5); no target passed → use uncommitted mode instead.
      2. Resolve default branch → `$def`. Source `${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/resolve-base.sh`; the script loops over the standard candidates and exports `DEF`. `$def` doesn't verify → abort, report "could not resolve default branch — pass explicit base".
+        _CLAUDE_PLUGIN_ROOT is valid here because the plugin root contains skills/, so the harness-loaded path resolves._
      3. Compute `base`. `base = git merge-base "$def" "$head"` (or given base).
      4. No working-tree mutation to force clean. Run `git status --porcelain`; dirty → abort, report — never `stash`/`checkout`/`reset` to force clean. Committed mode needs a clean tree; the reviewer may Read working-tree files for context.
      5. Capture diff. `git diff "$base".."$head"` (append `-- <path>` if a path was given in step 1).
@@ -113,7 +114,7 @@ Resolve code review feedback received from a human, bot, or subagent.
      - Strip the remote prefix: `local_def="${DEF#origin/}"`. Compare `$(git rev-parse --abbrev-ref HEAD)` to `local_def`. On match (you are on the default branch), prompt the user for a branch name and switch before committing — do NOT enforce a `review/<summary>` naming policy. Else stay on the current branch.
      - If `$(git rev-parse --abbrev-ref HEAD)` returns `HEAD` (detached HEAD), note it and stop — no commit on a detached HEAD.
      - Contract note: `DEF` is assumed remote-tracking (`origin/<name>`); the `${DEF#origin/}` strip depends on this contract. If `resolve-base.sh` ever exports a local ref (e.g. `main` instead of `origin/main`), the strip must be removed — a changed contract would silently make `local_def` empty and the guard a no-op.
-     - Commit the changes; message = the text after the `Change summary:` prefix from the review dispatch (Request Mode Step 2 template at `review/SKILL.md:48`; in Resolve Mode, the Change summary is carried forward from the originating Request-mode pass).
+     - Commit the changes; message = the text after the `Change summary:` prefix from the review dispatch (Request Mode Step 2 template at §Request Mode › Dispatch prompt; in Resolve Mode, the Change summary is carried forward from the originating Request-mode pass).
      - Prompt the user before push or opening a PR. On confirm: `git push -u origin <branch>` then `gh pr create` with body = the `Change summary:` line. If resolve mode was entered WITHOUT a prior dispatch (no Change summary in hand), derive the PR body and commit message from `git log` of the commits being pushed (e.g. `git log --format=%s -n1 <base>..<head>`) — state this fallback explicitly.
      - If `gh` fails (not installed / not authed), report the failure verbatim and stop — no silent skip. The commit + push already succeeded by the time `gh` runs.
      - No user to ask (autonomous invocation) → stop after commit and report; no push, no PR. A fresh review wanted → hand off to request mode (re-review pass N).

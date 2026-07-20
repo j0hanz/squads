@@ -1,6 +1,6 @@
 ---
 name: parallel-brainstorming
-description: Use when requirements are vague, the solution space is open, AND two or more distinct architectural approaches are in play, before a plan exists.
+description: Use when requirements are vague, the solution space is open, AND two or more distinct architectural approaches are in play, before a plan exists. Not for a named feature plan — use plan.
 argument-hint: '[feature request or problem to explore]'
 ---
 

@@ -59,6 +59,7 @@ _For an approved-plan handoff, derive these from the task block instead of askin
 ## Step 1: RED (Failing Test)
 
 _If JavaScript/TypeScript, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/references/js-ts-patterns.md` fully._
+_CLAUDE_PLUGIN_ROOT is valid here because the plugin root contains skills/, so the harness-loaded path resolves._
 
 1.1. Write the smallest test for one behavior.
 1.2. Stub the implementation (e.g. `return null`) — just enough to compile/run. (Skip in `parallel-debugging` autonomous handoff — implementation already exists; see that paragraph in this skill.)

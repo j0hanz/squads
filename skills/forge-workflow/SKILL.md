@@ -51,7 +51,7 @@ Abstain counts as 0.5 refutation toward threshold. A finding not actively confir
 
 **Loop until done — absolute ceiling:** `ceil(N / 2)` total rounds where N = initial item count — no minimum floor. Stop on 2 consecutive empty rounds or the diminishing-returns signal (3 rounds yielding only 1 new item). Log every round; silence ≠ convergence.
 
-Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new** (dedupe-empty). The adversarial-verify variant used by `debug-verify` instead stops on 2 consecutive **no-survivor** rounds (all claims refuted), since its hypotheses are fixed at invocation. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
+Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new** (dedupe-empty). The adversarial-verify variant used by `debug-verify` instead stops on 2 consecutive **no-survivor** rounds (all claims refuted), since its hypotheses are fixed at invocation. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges. The debug-verify variant uses a minimum floor of 4 — its 2-consecutive-no-survivor stop is unreachable at ceil(N/2) < 2 (N ≤ 2), so a floor makes the stop condition fire.
 
 Exploring _design approaches_ isn't a Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there; ideation phases forbid subagents.
 

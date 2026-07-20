@@ -182,10 +182,16 @@ def _load_project_synonyms(cwd: Path) -> dict[str, list[str]]:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"warning: synonyms.json unreadable ({exc}); synonyms ignored", file=sys.stderr)
+        print(
+            f"warning: synonyms.json unreadable ({exc}); synonyms ignored",
+            file=sys.stderr,
+        )
         return {}
     if not isinstance(raw, dict):
-        print("warning: synonyms.json is not a JSON object; synonyms ignored", file=sys.stderr)
+        print(
+            "warning: synonyms.json is not a JSON object; synonyms ignored",
+            file=sys.stderr,
+        )
         return {}
     result: dict[str, list[str]] = {}
     for key, value in raw.items():
@@ -535,9 +541,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     # Scope must reflect everything that matched, not the capped report list
     total_matched = len(result.related_files)
     matched_modules = {
-        Path(f.path).parts[0]
-        if len(Path(f.path).parts) > 1
-        else "<root>"
+        Path(f.path).parts[0] if len(Path(f.path).parts) > 1 else "<root>"
         for f in result.related_files
     }
 

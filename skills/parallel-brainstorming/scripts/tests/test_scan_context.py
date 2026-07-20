@@ -27,7 +27,7 @@ def _git_available() -> bool:
             timeout=5,
         )
         return True
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return False
 
 
@@ -76,6 +76,7 @@ def _git_commit_all(repo_root: Path, msg: str = "init") -> None:
 
 # --- Step 1/2: _sanitize_noun trust boundary (already shipped, now locked) ---
 
+
 def test_sanitize_noun_rejects_empty_and_flags():
     with pytest.raises(ValueError):
         sc._sanitize_noun("")
@@ -90,6 +91,7 @@ def test_sanitize_noun_strips_regex_meta():
 
 
 # --- Step 1: project synonyms sanitized before reaching grep ---
+
 
 def test_load_project_synonyms_drops_regex_meta_and_empty(tmp_path, capfd):
     (tmp_path / "synonyms.json").write_text(
@@ -106,6 +108,7 @@ def test_load_project_synonyms_drops_regex_meta_and_empty(tmp_path, capfd):
 
 # --- Step 2: malformed synonyms.json warns, returns {} ---
 
+
 def test_load_project_synonyms_warns_on_bad_json(tmp_path, capfd):
     (tmp_path / "synonyms.json").write_text("{not json", encoding="utf-8")
     assert sc._load_project_synonyms(tmp_path) == {}
@@ -115,10 +118,13 @@ def test_load_project_synonyms_warns_on_bad_json(tmp_path, capfd):
 def test_load_project_synonyms_warns_on_non_object(tmp_path, capfd):
     (tmp_path / "synonyms.json").write_text("[1, 2, 3]", encoding="utf-8")
     assert sc._load_project_synonyms(tmp_path) == {}
-    assert "warning: synonyms.json is not a JSON object" in capfd.readouterr().err
+    assert (
+        "warning: synonyms.json is not a JSON object" in capfd.readouterr().err
+    )
 
 
 # --- Step 3: root-level files count toward the boundary signal ---
+
 
 @_GIT_REQUIRED
 def test_scope_boundary_with_root_file(tmp_path):
@@ -134,18 +140,24 @@ def test_scope_boundary_with_root_file(tmp_path):
 
 # --- Step 4: _find_test_file prunes _SKIP_DIRS during os.walk ---
 
+
 def test_find_test_file_skips_vendor_dirs(tmp_path):
     (tmp_path / "foo.py").write_text("# source\n", encoding="utf-8")
     (tmp_path / "tests").mkdir()
-    (tmp_path / "tests" / "test_foo.py").write_text("# real test\n", encoding="utf-8")
+    (tmp_path / "tests" / "test_foo.py").write_text(
+        "# real test\n", encoding="utf-8"
+    )
     vendored = tmp_path / "tests" / "node_modules" / "pkg"
     vendored.mkdir(parents=True)
-    (vendored / "test_foo.py").write_text("# vendored trap\n", encoding="utf-8")
+    (vendored / "test_foo.py").write_text(
+        "# vendored trap\n", encoding="utf-8"
+    )
     found = sc._find_test_file(tmp_path / "foo.py", tmp_path)
     assert found == "tests/test_foo.py"
 
 
 # --- Step 6: _grep_files semantics: [] on zero matches, None on no tool ---
+
 
 @_GIT_REQUIRED
 def test_grep_files_returns_empty_on_no_matches(tmp_path):

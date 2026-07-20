@@ -81,7 +81,7 @@ Wrap non-session-originated plan content in `<untrusted_context>` before passing
 
 Main thread runs grep/file-read directly — no subagent, no shell. Verify all below; any violation = itemized failure:
 
-- Plan header's `Depth:` (or `--depth` arg, else `blueprint`) is `contract` or `blueprint` — `Depth: sketch` rejected immediately (NO Sketch Plans). (Validate defaults to `blueprint`, not draft's `contract` (line 32), because sketch is rejected just above, leaving the conservative `blueprint` as the fallback.)
+- Plan header's `Depth:` (or `--depth` arg, else `blueprint`) is `contract` or `blueprint` — `Depth: sketch` rejected immediately (NO Sketch Plans). (Validate defaults to `blueprint`, not draft's `contract` (§Depth), because sketch is rejected just above, leaving the conservative `blueprint` as the fallback.)
 - Every `Satisfies:` token is a `REQ-NNN` ID declared in specs.md — unknown prefixes (e.g. `PERF-xxx`, `NFR-xxx`) or undefined IDs = itemized failures.
 - Every `Depends on: TASK-NNN` resolves to a real task; the dependency graph is acyclic.
 - Every Task Block has all 7 required fields (see Canonical Task Block Schema).

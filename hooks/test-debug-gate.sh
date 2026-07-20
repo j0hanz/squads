@@ -67,8 +67,27 @@ touch -d '3 hours ago' "$ff" 2>/dev/null || touch -t "$(date -d '3 hours ago' +%
 run "aged-flag-cleared-edit-ok" 0 \
   "{\"session_id\":\"$SID\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"src/app.js\"}}"
 
+# (g) flag set + Skill squads:dispatch-agents does NOT lift the gate; subsequent
+# Edit on a production file → exit 2 (dispatch-agents is a triage step, not a
+# hand-off to tdd/plan, so reproduce-first still binds).
+SID="dbg-$$-g"
+: > "$(flagfile "$SID")"
+run "dispatch-agents-does-not-lift-flag" 0 \
+  "{\"session_id\":\"$SID\",\"tool_name\":\"Skill\",\"tool_input\":{\"skill\":\"squads:dispatch-agents\"}}"
+run "dispatch-agents-then-edit-denied" 2 \
+  "{\"session_id\":\"$SID\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"src/app.js\"}}"
+
+# (h) bare "test.js" filename is NOT exempt — the glob requires a delimiter
+# (test_ / _test / .test.) so a file literally named test.js is denied and
+# documented; extend the glob only if the user says otherwise.
+SID="dbg-$$-h"
+: > "$(flagfile "$SID")"
+run "bare-test-js-denied" 2 \
+  "{\"session_id\":\"$SID\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"test.js\"}}"
+
 # Cleanup this run's flag files.
 rm -f "$(flagfile "dbg-$$-a")" "$(flagfile "dbg-$$-b")" "$(flagfile "dbg-$$-c")" \
-      "$(flagfile "dbg-$$-d")" "$(flagfile "dbg-$$-e")" "$(flagfile "dbg-$$-f")"
+      "$(flagfile "dbg-$$-d")" "$(flagfile "dbg-$$-e")" "$(flagfile "dbg-$$-f")" \
+      "$(flagfile "dbg-$$-g")" "$(flagfile "dbg-$$-h")"
 
 exit "$fail"

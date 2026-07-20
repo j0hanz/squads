@@ -25,13 +25,13 @@ Single-thread reproduce-then-isolate handles most bugs. Fan out parallel hypothe
 - Multiple plausible hypotheses compete — including ones already named by report, stack trace, or caller graph (fan out immediately, don't single-thread highest-prior first).
 - Bug spans modules, several candidate causes could each explain it.
 
-Single-thread justified only when stack trace's top frame IS root-cause line (where wrong code lives, not where crash surfaced) AND `git grep` shows ≤1 caller of that function — otherwise fan out. Obvious one-line bug: stay single-thread through Steps 1–2 (one hypothesis, investigated inline with same structured return), then dispatch two fresh skeptics with distinct refutation angles to refute it in Step 3 — judge ≠ generator holds regardless of fleet size. When in doubt, fan out — fleet cost lower than wrong single-thread fix.
+Single-thread justified only when stack trace's top frame IS root-cause line (where wrong code lives, not where crash surfaced) AND `git grep` shows ≤1 caller of that function — otherwise fan out. Obvious one-line bug: stay single-thread through Steps 1–2 (one hypothesis, investigated inline with same structured return), then dispatch two fresh skeptics with distinct refutation angles to refute it in Step 3 — per the [dispatch-agents Invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch); investigation is a hypothesis, not finding, even single-thread. When in doubt, stay single-thread through Steps 1–2 — fan out only when ≥2 plausible hypotheses survive the first repro.
 
 ## Invariants — apply to every dispatch
 
 All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply verbatim. Debugging-specific additions:
 
-- **No mocked investigators or skeptics.** Investigators and skeptics are distinct subagents dispatched via the Agent tool with isolated context — main thread never generates their findings or grades hypothesis it formed or read. In-thread "investigation" is a hypothesis, not finding; in-thread "refutation" is self-review, not verification.
+- **No mocked investigators or skeptics.** Per the [dispatch-agents Invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch); main thread never generates investigators' findings or grades a hypothesis it formed or read — investigation is a hypothesis, not finding.
 - **Bare-claim hypotheses to skeptics.** Hypothesis handed to skeptic is one-line claim — `root cause is <X> at <file:line>, classified as <logic|design-level>` — no reasoning, no evidence walkthrough, no caller/graph findings. Skeptic re-derives evidence from repro and verbatim output alone; smuggling investigator's reasoning into the hypothesis defeats judge ≠ generator while satisfying every literal rule.
 
 ## Step 0: Triage

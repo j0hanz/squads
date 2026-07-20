@@ -103,5 +103,40 @@ tmp_empty="$(mktemp -t wf-empty-XXXXXX.js 2>/dev/null || mktemp)"
 run "workflow-scriptpath-empty-file-ok" 0 \
   "{\"tool_name\":\"Workflow\",\"tool_input\":{\"scriptPath\":\"$tmp_empty\"}}"
 
-rm -f "$tmp_clean" "$tmp_ph" "$tmp_uc_ph" "$tmp_uc_diff" "$tmp_empty"
+# 15. Malformed JSON → exit 2 (fail-closed parse error, TASK-001 #2).
+run "malformed-json-denied" 2 '{bad json'
+
+# 16. Prose mention of <untrusted_context> (inline, not a standalone line) with a
+#     raw diff → exit 2. The standalone-line UC guard does not match prose, so the
+#     raw-diff check still fires (TASK-001 #3).
+run "prose-uc-mention-rawdiff-denied" 2 \
+  '{"tool_input":{"prompt":"see the <untrusted_context> convention\ndiff --git a b\n+evil\n"}}'
+
+# 17. Reviewer-dispatch cap: 3rd pass for the same session_id+Change summary →
+#     exit 0, 0, 2 (TASK-001 #5). Unique sid+summary so the count file cannot
+#     collide with prior runs (120-min expiry notwithstanding).
+sid_cap="smoke-cap-$$-$RANDOM"
+cap_json="{\"session_id\":\"$sid_cap\",\"tool_input\":{\"prompt\":\"<!-- squads:reviewer-dispatch -->\nChange summary: cap-test-$RANDOM\n\"}}"
+run "review-cap-pass-1" 0 "$cap_json"
+run "review-cap-pass-2" 0 "$cap_json"
+run "review-cap-pass-3-denied" 2 "$cap_json"
+
+# 18. No "Change summary:" line → two distinct prompts get separate buckets
+#     (keyed on whole-prompt cksum), both exit 0 on first pass (TASK-001 #6).
+sid_nosum="smoke-nosum-$$-$RANDOM"
+run "review-no-summary-prompt-A-first-pass" 0 \
+  "{\"session_id\":\"$sid_nosum\",\"tool_input\":{\"prompt\":\"<!-- squads:reviewer-dispatch -->\nreview prompt A\n\"}}"
+run "review-no-summary-prompt-B-first-pass" 0 \
+  "{\"session_id\":\"$sid_nosum\",\"tool_input\":{\"prompt\":\"<!-- squads:reviewer-dispatch -->\nreview prompt B\n\"}}"
+
+# 19. Clean inline .script carrying a balanced <untrusted_context> wrapper must
+#     NOT mask a placeholder in .scriptPath → exit 2 (L2 gap: case 9 covers a
+#     clean inline decoy with no UC, case 13 covers a UC decoy + rawdiff
+#     scriptPath; this fills the UC-decoy + placeholder-scriptPath cell).
+tmp_uc_bal_ph="$(mktemp -t wf-ucbph-XXXXXX.js 2>/dev/null || mktemp)"
+printf '{{branch}}\n' > "$tmp_uc_bal_ph"
+run "workflow-clean-uc-inline-dirty-scriptpath-placeholder-denied" 2 \
+  "{\"tool_name\":\"Workflow\",\"tool_input\":{\"script\":\"<untrusted_context>\\nbenign\\n</untrusted_context>\\n\",\"scriptPath\":\"$tmp_uc_bal_ph\"}}"
+
+rm -f "$tmp_clean" "$tmp_ph" "$tmp_uc_ph" "$tmp_uc_diff" "$tmp_empty" "$tmp_uc_bal_ph"
 exit "$fail"

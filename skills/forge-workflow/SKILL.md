@@ -12,7 +12,7 @@ Forge composes native dynamic workflow scripts from a small canon of orchestrati
 
 Every generated script embeds these six invariants. They are mechanical, not prose — the script code enforces them at runtime.
 
-1. **Judge ≠ generator — separate agent() calls.** The agent that adjudicates (skeptic, judge, validator) and the agent that generated the work under review are two distinct `agent()` calls with isolated context. The generating agent's reasoning never flows into the adjudicating agent's prompt — only the bare output does. In-thread "verification" of a generated artifact is self-review, not verification, and is rejected at audit.
+1. **Judge ≠ generator — separate agent() calls.** Per the [dispatch-agents Invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch): the adjudicating and generating agents are two distinct `agent()` calls with isolated context, and an in-thread "verification" is rejected at audit.
 
 2. **In-script bare-claim truncation between generator and skeptic.** Between the generator stage and the skeptic stage, the script truncates each candidate claim to a one-line bare form — `root cause is <X> at <file:line>, classified as <logic|design-level>` for debug-verify, or `<claim> at <file:line>, classified as <class>` elsewhere. Any claim lacking the `(file:line, classification)` tuple is truncated or dropped before the skeptic reads it. Smuggling the generator's reasoning into the claim defeats judge ≠ generator while satisfying every literal rule; truncation in code, not in prompt, is the enforcement.
 
@@ -30,14 +30,14 @@ This is the single source for the six orchestration shapes and the unified quoru
 
 Pick first fit; compose when the task demands it.
 
-| Pattern                  | Shape                                                                                                              | Use when                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| **Fan out & synthesize** | One agent per independent chunk → barrier → merge with provenance                                                  | Research, audits, due diligence, per-file/per-folder sweeps |
-| **Adversarial verify**   | 2+ fresh skeptics per finding, prompted to _refute_ it; quorum table below determines outcome                      | Any finding or claim about to be acted on or shipped        |
-| **Generate & filter**    | One agent overgenerates (40+, not 5) → separate judge scores against rubric                                        | Taste bottlenecks: names, titles, bulk candidate sets       |
-| **Tournament**           | Pairwise fresh-context matches, winners advance bracket-style                                                      | Ranking large sets without one bloated, biased context      |
-| **Classify & act**       | Classifier routes each item to its handler; dedupe before acting                                                   | Mixed-type inboxes, triage, heterogeneous queues            |
-| **Loop until done**      | Keep dispatching rounds until condition holds — stop on 2 consecutive empty rounds OR absolute ceiling (see below) | Flaky bugs, unknown-size discovery                          |
+| Pattern                  | Shape                                                                                                                                        | Use when                                                    |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **Fan out & synthesize** | One agent per independent chunk → barrier → merge with provenance                                                                            | Research, audits, due diligence, per-file/per-folder sweeps |
+| **Adversarial verify**   | 2+ fresh skeptics per finding, prompted to _refute_ it; quorum table below determines outcome                                                | Any finding or claim about to be acted on or shipped        |
+| **Generate & filter**    | One agent overgenerates beyond the obvious — typically 10-20 for naming, 40+ only for bulk title sets → separate judge scores against rubric | Taste bottlenecks: names, titles, bulk candidate sets       |
+| **Tournament**           | Pairwise fresh-context matches, winners advance bracket-style                                                                                | Ranking large sets without one bloated, biased context      |
+| **Classify & act**       | Classifier routes each item to its handler; dedupe before acting                                                                             | Mixed-type inboxes, triage, heterogeneous queues            |
+| **Loop until done**      | Keep dispatching rounds until condition holds — stop on 2 consecutive empty rounds OR absolute ceiling (see below)                           | Flaky bugs, unknown-size discovery                          |
 
 **Adversarial verify — quorum table:**
 
@@ -49,7 +49,7 @@ Pick first fit; compose when the task demands it.
 
 Abstain counts as 0.5 refutation toward threshold. A finding not actively confirmed by at least one skeptic is treated as unverified (PARTIAL, not PASS).
 
-**Loop until done — absolute ceiling:** `ceil(N / 2)` total rounds where N = initial item count, minimum 4. Additionally: if 3 consecutive rounds each yield only 1 new item, stop (diminishing-returns signal). Log every round; silence ≠ convergence.
+**Loop until done — absolute ceiling:** `ceil(N / 2)` total rounds where N = initial item count — no minimum floor. Stop on 2 consecutive empty rounds or the diminishing-returns signal (3 rounds yielding only 1 new item). Log every round; silence ≠ convergence.
 
 Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new** (dedupe-empty). The adversarial-verify variant used by `debug-verify` instead stops on 2 consecutive **no-survivor** rounds (all claims refuted), since its hypotheses are fixed at invocation. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges.
 

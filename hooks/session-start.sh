@@ -8,6 +8,9 @@ set -uo pipefail
 if ! command -v jq >/dev/null 2>&1; then
   echo 'squads: WARNING — jq not found; dispatch-check and debug-gate guards are inactive this session. Fix: winget install jqlang.jq'
   echo
+else
+  hooks_json="${BASH_SOURCE[0]%/*}/hooks.json"
+  jq -r '"squads hooks wired: dispatch-check[\(.hooks.PreToolUse[0].matcher)] debug-gate[\(.hooks.PreToolUse[1].matcher)]"' "$hooks_json"
 fi
 
 router='Route every incoming task or user request to [dispatch-agents](../dispatch-agents/SKILL.md); its Step 0 Governor classifies the request (first match wins) and picks the workflow + fleet shape. Skip only for pure conversation or a one-shot edit answerable direct.'

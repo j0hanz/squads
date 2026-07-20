@@ -14,6 +14,10 @@ Every incoming task/request starts here. The Governor gates on a preflight, deci
 
 Native dynamic workflows are a platform hard-dependency for composed mode. Check the preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight). If any fail, composition is OFF — the Governor routes inline only, no silent degrade inside forge.
 
+### Hook-fire probe (observability, REQ-OBS)
+
+The Governor itself — MAIN-THREAD, not a subagent (a subagent cannot dispatch a subagent per hub-and-spoke, and cannot see the main thread's hook stdout) — makes one trivial Agent call ("reply with the single word: pong") and checks its OWN context for the `squads dispatch-check: ok` line emitted by `hooks/dispatch-check.sh`. If the line is absent, the Governor reports "hook not observable for live tool calls — file-state guards (reviewer cap, debug-gate flag) are best-effort only" and proceeds, rather than silently assuming the guards fire. No "once per session, cached" — the plugin is markdown-only with no runtime state, so a cache has no implementation path; the probe runs when the Governor runs.
+
 ### Governor Threshold Table (first-match, decides mode)
 
 | Signal                                                                                                                       | → mode / class                                        |
@@ -131,9 +135,7 @@ Pattern shapes, quorum, and loop ceilings live in [forge-workflow](../forge-work
 
 - **Model:** every dispatched agent uses `model: 'haiku'` where the Agent tool exposes the param, on every stage, regardless of role. Param unavailable or tier unknown → omit it (inherit the session model). No cheap/strong/strongest tiers, no promote/demote escalation.
 - **Verification depth is a prompt instruction, never a model tier** — say "think carefully, verify before answering" or "quick best-effort, one pass" in the prompt; do not swap models to buy quality.
-- **Timeout:** one flat 5-min wall-clock budget per branch; exceed → FAIL, retry once, then SKIP with reason. A worker that keeps timing out means the task was too big — split it at plan time, don't raise the model.
-- **Concurrency:** ~10 agents run at once; overflow queues, never silently drops.
-- **Reads parallel, writes serial:** parallelize read-only fan-out freely up to the concurrency cap; serialize writers, or isolate each in its own `git worktree` when `Files:` overlap.
+- Timeout, concurrency, and reads-parallel/writes-serial policy: see [Invariants](#invariants--apply-to-every-dispatch) — stated once there, not repeated here.
 
 ## Executing an approved plan
 
@@ -144,6 +146,8 @@ When [plan](../plan/SKILL.md) (validate mode) hands off an APPROVED `docs/plan/<
 - **`Validate:` is the structured return.** Each worker runs the task's `Validate:` command and reports exit code + output — a task that doesn't pass isn't done. Pass: `STATUS: PASS — Validate: <cmd> exit 0; files: <list>`. Fail/partial: full structured return with `file:line` findings (see Invariants). A failed `Validate:` from an impl bug (not a plan error) routes to `parallel-debugging` — reproduce/isolate the root cause before re-fixing; a genuinely wrong plan routes to `plan`.
 - **`Satisfies:` goes into the worker's spec.** Worker gets the REQ-NNN IDs and matching REQ text blocks from `specs.md` — knows the acceptance criterion, not just the action.
 
+Update task status only on state transitions (pending→in_progress at start, in_progress→completed at `Validate:` pass) — not after every sub-step.
+
 **Done when:** every task dispatched in dependency order returns a passing `Validate:` exit code, or a failing task routes to `parallel-debugging` (impl bug) / `plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint — no separate run file.
 
 ### Execution recipe (one small task per agent)
@@ -151,9 +155,13 @@ When [plan](../plan/SKILL.md) (validate mode) hands off an APPROVED `docs/plan/<
 The default shape for executing an approved plan:
 
 1. **Fan out** one worker per plan task (`haiku`), parallel where `Depends on:` allows and `Files:` are disjoint; serial (or per-worktree) where they overlap.
-2. **Critic per output** — one fresh `haiku` critic per worker result (judge≠generator, bare-claim in), refuting against the task's `Validate:` / `Satisfies:` criterion.
+2. **Critic on failure signal** — Dispatch one critic per worker ONLY when `Validate:` exits non-zero OR the structured return's `findings` is non-empty. The `Validate:` exit code is the independent signal — a worker's self-reported PASS with a green `Validate:` is trusted; do not run a critic on clean output. On `Validate:` FAIL or non-empty findings, dispatch one fresh `haiku` critic against the task's `Validate:` / `Satisfies:` criterion (judge≠generator, bare-claim in).
 3. **Synthesize barrier** — main thread merges surviving results before the next dependency layer.
 4. **Loop / retry-one** for any failed task; never redo the batch.
+
+**Batch related fixes before re-verifying** — one re-audit covers multiple fixes, not one re-audit per fix.
+
+**Skip the verify workflow when the changeset is hook-only AND the test suite already covers the changed branches** — the suite is the verification.
 
 **Granularity rule:** a worker task must be haiku-sized (bounded files, one behavior, a runnable `Validate:`). An oversized task is decomposed at plan time; dispatch refuses it back to plan rather than handing a big job to one agent.
 
@@ -163,9 +171,9 @@ For multi-milestone work, three roles — all three inherit the flat policy, see
 
 1. **Orchestrator** plans features, milestones, and the validation contract — concrete correctness assertions written before any code exists.
 2. **Workers** implement per file overlap (reads-parallel/writes-serial): overlap → serial, one at a time, each committing so the next inherits clean state; disjoint → parallel, each in its own `git worktree` (main thread creates worktrees, dispatches in one message, merges branches back serially). **Idempotent commits:** the orchestrator records the pre-work SHA for each worker before dispatch; on retry, the worker MUST `git reset --hard <sha>` before re-applying changes — never append to a partial commit.
-3. **Validators** — who never saw the code — check each milestone twice: static scrutiny (tests, types, lint, review) and behavior (actually exercise the running thing end-to-end).
+3. **Validators** — who never saw the code — check each milestone in a single pass that runs both the static suite (tests, types, lint, review) and the end-to-end behavior exercise (actually run the thing).
 
-**Done when:** each milestone passes both static and behavior validation; a failing milestone routes to parallel-debugging (impl bug) or plan (plan error).
+**Done when:** each milestone passes that single-pass validation; a failing milestone routes to parallel-debugging (impl bug) or plan (plan error).
 
 ## Next Skills
 

@@ -74,10 +74,11 @@ _If unsure how minimal is minimal, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/refere
 1. Checkpoint the working tree before editing.
 2. Write the smallest implementation that satisfies the test — no speculative generality.
 3. No code added "just in case" — only what the current test requires.
-4. 3 failed attempts on the same test → restart with a smaller test (at most 2 restarts).
-5. After the 2nd restart also fails 3 attempts → escalate to `parallel-debugging` (reproduce and re-isolate the root cause) or [plan](../plan/SKILL.md) (if the design itself is wrong).
+4. 3 failed attempts on the same test → escalate directly to `parallel-debugging` (reproduce and re-isolate the root cause) or [plan](../plan/SKILL.md) (if the design itself is wrong).
 
 ### N-1 Test (False-Green Elimination)
+
+**Gate:** run this check on the FIRST behavior of a session. For subsequent behaviors in the same session, the harness is trusted — skip the N-1 revert/restore unless the test arrived GREEN on first run with no observed RED.
 
 Before trusting a passing test:
 
@@ -110,7 +111,7 @@ Any of these means you've left TDD — the fix is the same every time. Don't arg
 - The test trivially passes without exercising the logic under test (e.g. asserts a constant the stub returns, mocks the unit itself, or never calls the code path).
 - Tests retrofitted to already-written code ("tests-after"), or a test edited to force a pass.
 - Self-talk: "too simple to test", "I already manually tested it", "tests after achieve the same purpose", "it's the spirit that matters", "this is different because...".
-- Skipping the N-1 check because "it obviously would fail" — a test you haven't seen fail tests nothing.
+- Skipping the N-1 check on the first behavior of a session because "it obviously would fail" — a test you haven't seen fail tests nothing.
 - A GREEN that arrives on the first run with no RED observed for that behavior.
 - Keeping code-first output "as reference" or "to adapt" instead of deleting it.
 

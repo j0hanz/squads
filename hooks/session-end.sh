@@ -6,7 +6,13 @@ set -uo pipefail
 
 command -v jq >/dev/null 2>&1 || exit 0 # no jq -> guards never wrote state
 
-session_id=$(jq -r '.session_id // empty' 2>/dev/null | tr -cd 'a-zA-Z0-9-')
+# Read hook input once; jq consumes stdin. Fail-safe: missing fields -> "unknown".
+input=$(cat)
+m_sid=$(printf '%s' "$input" | jq -r '.session_id // "unknown"' 2>/dev/null)
+m_reason=$(printf '%s' "$input" | jq -r '.reason // "unknown"' 2>/dev/null)
+printf 'squads session-end: %s reason=%s\n' "$m_sid" "$m_reason"
+
+session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null | tr -cd 'a-zA-Z0-9-')
 # Empty id -> bail. Never glob without the id: that would delete other
 # sessions' state. Fallback-named files ("unknown"/"no-session-id") are
 # left to the 120-minute expiry.

@@ -535,8 +535,9 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     total_matched = len(result.related_files)
     matched_modules = {
         Path(f.path).parts[0]
-        for f in result.related_files
         if len(Path(f.path).parts) > 1
+        else "<root>"
+        for f in result.related_files
     }
 
     # Cap to _MAX_FILES most relevant files

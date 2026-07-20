@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry (exec-form). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated — see docs/design/2026-07-20-squads-hooks-redesign-design.md.",
+  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated — see docs/design/2026-07-20-squads-hooks-redesign-design.md.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,8 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "session-start"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start",
             "timeout": 5
           }
         ]
@@ -20,8 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "dispatch-check"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check",
             "timeout": 30
           }
         ]
@@ -31,8 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "debug-gate"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" debug-gate",
             "timeout": 30
           }
         ]
@@ -42,8 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "tdd-gate"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" tdd-gate",
             "timeout": 30
           }
         ]
@@ -53,8 +49,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "plan-schema"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" plan-schema",
             "timeout": 30
           }
         ]
@@ -66,8 +61,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "tdd-arm"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" tdd-arm",
             "timeout": 30
           }
         ]
@@ -78,8 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "return-shape"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" return-shape",
             "timeout": 30
           }
         ]
@@ -90,8 +83,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash",
-            "args": ["${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh", "session-end"],
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-end",
             "timeout": 5
           }
         ]

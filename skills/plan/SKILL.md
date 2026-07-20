@@ -13,7 +13,8 @@ Draft or validate a plan/specs pair. Two modes, inferred from argument shape —
 Resolve in order:
 
 1. First positional resolves to an existing `docs/plan/*.plan.md` file path → **validate** mode. Optional second arg is the specs path; absent → derive by substituting `.plan.md` → `.specs.md`.
-2. Otherwise → **draft** mode: argument is free-text feature description; base name = kebab-case of it (e.g. `new-login-flow`).
+2. First positional resolves to any other existing file (design doc, notes) → **draft** mode: read it; its content is the feature description. Base name = kebab-case of its topic, stripping date prefixes and `-design`/`.md` suffixes (e.g. `2026-07-20-x-redesign-design.md` → `x-redesign`). If it records a locked or user-approved design, ideation is settled: skip Step 2 entirely — main thread sequences tasks inline from the locked design (depth still governs validation).
+3. Otherwise → **draft** mode: argument is free-text feature description; base name = kebab-case of it (e.g. `new-login-flow`).
 
 No `AskUserQuestion` for mode. Announce mode in the first output line — in draft, also announce inferred depth + subagent count. No pause.
 
@@ -29,7 +30,7 @@ Draft `docs/plan/<kebab-name>.specs.md` + `docs/plan/<kebab-name>.plan.md`.
 | contract  | 2                             | main thread merges  | yes            |
 | blueprint | 3                             | 1 Synthesizer agent | yes            |
 
-Infer depth (draft only): `--depth` flag → use it; else keywords — `sketch`: "throwaway / rough / spike / quick note / temporary"; `blueprint`: "production / migration / rollout / breaking change / compliance / security / structural"; default `contract`.
+Infer depth (draft only): `--depth` flag → use it; else keywords — `sketch`: "throwaway / rough / spike / quick note / temporary"; `blueprint`: "production / migration / rollout / breaking change / compliance / security / structural"; default `contract`. Proportionality cap: keyword-inferred `blueprint` with a Step 1 candidate surface of ≤50 files demotes to `contract` — blueprint machinery is for large surfaces; only an explicit `--depth blueprint` overrides. Run the sizing Glob before announcing depth.
 
 ### Step 1: Discovery
 
@@ -39,7 +40,7 @@ Main thread starts with a quick Glob to size the candidate surface. At ≤50 can
 
 ### Step 2: Parallel Drafting (Ideators)
 
-Dispatch ideators in ONE message, blind to each other, each given the Step 1 Context Report, write/edit tools denied — ideators return proposals, never mutations.
+Dispatch ideators in ONE message as parallel Agent calls with `run_in_background: false` — never staggered across turns, never background (async waves idle the main thread and stall synthesis on notification lag). Blind to each other, each given the Step 1 Context Report, write/edit tools denied — ideators return proposals, never mutations. Each prompt states: the Context Report is authoritative — do NOT re-read files it covers; read only what it lacks. Locked design (Step 0) → this step is skipped.
 
 - `contract`: 2 agents — **Conventional**, **Risk-First**.
 - `blueprint`: 3 agents — **Conventional**, **Risk-First**, **Minimalist**.
@@ -49,7 +50,7 @@ Each ideator produces a lightweight proposal: short approach summary + numbered 
 
 ### Step 3: Synthesis
 
-`sketch`: skip — Step 2 output goes to Step 4. `contract`: main thread merges the 2 proposals, states what kept/discarded. `blueprint`: 1 Synthesizer agent (write/edit denied) merges all three, same rationale requirement. Write the merged result in Canonical Task Block Schema.
+`sketch`: skip — Step 2 output goes to Step 4. `contract`: main thread merges the 2 proposals, states what kept/discarded. `blueprint`: 1 Synthesizer agent (write/edit denied, `model: sonnet` — a merge needs no premium model) merges all three, same rationale requirement. Write the merged result in Canonical Task Block Schema.
 
 ### Step 4: Write
 
@@ -62,7 +63,7 @@ Save both files with headers `Status: DRAFT`, `Depth: <sketch|contract|blueprint
 
 ### Headless Fallback (REVISE from validate mode)
 
-Re-run synthesis only — don't re-dispatch ideators. `contract`: main thread re-synthesizes with REVISE findings as constraints. `blueprint`: re-dispatch the Synthesizer with REVISE findings. Re-submit to validate mode. Second REVISE → write a detailed error summary, notify user high-priority, stop (no `AskUserQuestion`).
+Re-run synthesis only — don't re-dispatch ideators. `contract`: main thread re-synthesizes with REVISE findings as constraints. `blueprint`: re-dispatch the Synthesizer with REVISE findings; it returns revised content for BOTH files — specs.md fixes included, never patched ad hoc by the main thread — and the main thread writes both. Re-submit to validate mode. Second REVISE → write a detailed error summary, notify user high-priority, stop (no `AskUserQuestion`).
 
 ## Validate Mode
 
@@ -87,14 +88,16 @@ Main thread runs grep/file-read directly — no subagent, no shell. Verify all b
 - Every Task Block has all 7 required fields (see Canonical Task Block Schema).
 - Every cited file path exists on disk, unless a task's `Action:` creates it — new-file paths are exempt.
 
-Report `N_passed / N_total` per category. Any `N_passed < N_total` → REVISE with itemized failures, skip Step 8.
+Print the `N_passed / N_total` table per category in the output BEFORE any critic dispatch — no printed table, no Step 8. Any `N_passed < N_total` → REVISE with itemized failures, skip Step 8.
 
 ### Step 8: Critic Fan-out (blueprint) or Single Critic (contract)
 
 Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer drafting context — judge ≠ generator.
 
 - **`contract`** — 1 critic, all three lenses in a single pass, lighter check focused on scope boundaries and dependency cycles. Lens rubrics below still apply; one agent holds all three.
-- **`blueprint`** — 3 critics dispatched in ONE message, one per lens, blind to each other.
+- **`blueprint`** — 3 critics dispatched in ONE message (parallel Agent calls, `run_in_background: false`), one per lens, blind to each other.
+
+Critics run `model: sonnet` — rubric checks need no premium model. First validation round only: critics sweep freely per their lens. **Re-validation round (after a REVISE)**: each critic receives the prior round's findings for its lens and judges ONLY whether each is resolved — no fresh sweep. New findings it volunteers are recorded as plan-header comments and never enter the verdict unless High. (Fresh full-sweep critics each round find new Meds forever — the loop can't converge.)
 
 Lens rubrics (each critic returns findings per its lens):
 
@@ -114,6 +117,8 @@ Read all critics' findings directly — no Arbiter agent. Dedupe findings by exa
 - **≥2 Med** findings across all critics' deduped findings → REVISE. Med findings from different lenses corroborate — count them separately, do not collapse to one.
 - Exactly **1 Med** (no High) → APPROVED (note the Med and any Low findings as a comment in the plan header).
 - **Low** only or nothing → APPROVED (note Low findings as a comment in the plan header).
+
+Re-validation round: unresolved prior High, or any NEW High → REVISE (2nd REVISE → escalate per Headless Fallback). Unresolved prior Meds count against the ≥2-Med threshold; new Meds are recorded in the plan header and never counted.
 
 ### Step 10: Finalize
 
@@ -146,6 +151,7 @@ Detail: [Specific requirement statement]
 ## Strict Rules
 
 - **NO Prompt at Step 0**: draft depth inferred — never pause for `AskUserQuestion`.
+- **Synchronous Fan-out**: every subagent wave (ideators, Synthesizer, critics) is ONE message of parallel Agent calls with `run_in_background: false`; subagent prompts declare provided context authoritative — no re-reading covered files.
 - **NO Re-Scan / Cross-Talk / Mocked Ideators (draft)**: pass the Context Report to ideators; ideators are distinct subagents, blind to each other; main thread can't generate them itself.
 - **NO Shell Execution (draft)**: during discovery/drafting/synthesis.
 - **NO Schema at Draft Stage**: ideators write lightweight proposals; schema is synthesis-only.

@@ -162,13 +162,16 @@ if [[ "$prompt" == *'squads:reviewer-dispatch'* ]]; then
   fi
   count_file="${TMPDIR:-/tmp}/squads-review-count-${sid:-no-session-id}-${change_key:-0}"
 
-  # Stale-count expiry: replace `find -mmin +120` with bash arithmetic on
-  # stat -c %Y (M4) — 7200s == 120min.
-  if [[ -f "$count_file" ]]; then
-    file_mtime=$(stat -c %Y "$count_file" 2>/dev/null || echo 0)
-    if (( $(date +%s) - file_mtime > 7200 )); then
-      rm -f "$count_file"
-    fi
+  # Stale-count expiry: a count file older than 120 min is removed so an
+  # abandoned review run can't wedge the cap. `find -mmin +120` is portable
+  # across BSD find (macOS), GNU find (Linux), and Git Bash; the prior
+  # `stat -c %Y` was GNU-only (BSD stat uses `stat -f %m`) and silently
+  # failed to expire on macOS. `+120` is minute-granular (strictly more than
+  # 120 min) vs the prior second-granular `> 7200` — at most a ~59s wider
+  # window, harmless; do not revert to stat. Falls through to the count read
+  # (no exit) so the review-cap still runs.
+  if [[ -n "$(find "$count_file" -mmin +120 2>/dev/null)" ]]; then
+    rm -f "$count_file"
   fi
 
   count=$(($(cat "$count_file" 2>/dev/null || echo 0) + 1))

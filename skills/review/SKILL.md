@@ -110,7 +110,7 @@ Resolve code review feedback received from a human, bot, or subagent.
 1. Re-run the tests covering the fixes, confirm pass. No tests cover the fix → say so, validate by reproducing the affected behavior manually.
 2. Route by outcome:
    - **Resolved** — first resolve the branch, then ship:
-     - Source `skills/review/scripts/resolve-base.sh` (idempotent — resolve-mode Step 1 does not source it); it exports `DEF` as a remote-tracking ref like `origin/main`.
+     - Source `${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/resolve-base.sh` (idempotent — resolve-mode Step 1 does not source it); it exports `DEF` as a remote-tracking ref like `origin/main`. _Same `${CLAUDE_PLUGIN_ROOT}` resolution as Request Mode Step 1.2 — the plugin root contains skills/, so the harness-loaded path resolves in any workspace._
      - Strip the remote prefix: `local_def="${DEF#origin/}"`. Compare `$(git rev-parse --abbrev-ref HEAD)` to `local_def`. On match (you are on the default branch), prompt the user for a branch name and switch before committing — do NOT enforce a `review/<summary>` naming policy. Else stay on the current branch.
      - If `$(git rev-parse --abbrev-ref HEAD)` returns `HEAD` (detached HEAD), note it and stop — no commit on a detached HEAD.
      - Contract note: `DEF` is assumed remote-tracking (`origin/<name>`); the `${DEF#origin/}` strip depends on this contract. If `resolve-base.sh` ever exports a local ref (e.g. `main` instead of `origin/main`), the strip must be removed — a changed contract would silently make `local_def` empty and the guard a no-op.

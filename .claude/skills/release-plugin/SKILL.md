@@ -15,6 +15,7 @@ rather than reinventing them ad hoc.
 | File                              | Field                                        |
 | --------------------------------- | -------------------------------------------- |
 | `package.json`                    | `"version"`                                  |
+| `package-lock.json`               | `"version"`                                  |
 | `.claude-plugin/plugin.json`      | `"version"`                                  |
 | `.claude-plugin/marketplace.json` | `plugins[0].version` (nested, not top-level) |
 

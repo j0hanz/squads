@@ -1,6 +1,6 @@
 # Annotated `debug-verify` example script
 
-Reference-only — illustrative, not a shipped artifact. A representative `debug-verify` workflow script with the four required annotations as inline comments.
+Reference-only — illustrative, not a shipped artifact. A representative `debug-verify` workflow script carrying the six required invariants / four required annotations as inline comments.
 
 ```javascript
 // debug-verify.js — illustrative, not shipped. Read-only class.
@@ -30,9 +30,27 @@ let seen = new Set(); // (file:line, classification) dedupe across rounds
 let roundLog = [];
 let noSurvivorRounds = 0;
 
+// Invariant 6 — agent-count cap per recipe. Recipe default scale is
+// N hypotheses × 2 skeptics (SKILL.md Recipe Catalog); across MAX_ROUNDS the
+// skeptic fan-out alone is hypotheses.length * SKEPTICS_PER * MAX_ROUNDS.
+// Abort before exceeding; silent caps read as full coverage.
+const TOTAL_CAP = hypotheses.length * SKEPTICS_PER * MAX_ROUNDS;
+let dispatched = 0;
+function willDispatch(n) {
+  if (dispatched + n > TOTAL_CAP) {
+    console.error(
+      `agent-count cap exceeded (${dispatched + n} > ${TOTAL_CAP}); aborting before dispatch, truncating remaining work.`,
+    );
+    return false;
+  }
+  dispatched += n;
+  return true;
+}
+
 for (let round = 1; round <= MAX_ROUNDS; round++) {
   // ===== each stage: investigator (blind, per-hyp) → truncation → skeptic → quorum =====
   // Stage A — investigators: one agent() per hypothesis, blind to each other.
+  if (!willDispatch(hypotheses.length)) break;
   const investigations = await Promise.all(
     hypotheses.map((hyp) =>
       agent({
@@ -66,13 +84,12 @@ for (let round = 1; round <= MAX_ROUNDS; round++) {
     });
 
   if (bareClaims.length === 0) {
-    noSurvivorRounds++;
-    if (noSurvivorRounds >= 2) break;
+    // empty round (nothing new after dedupe) — not a no-survivor round; just advance
     continue;
   }
-  noSurvivorRounds = 0;
 
   // Stage C — skeptics: SKEPTICS_PER fresh skeptics per claim, prompted to REFUTE.
+  if (!willDispatch(bareClaims.length * SKEPTICS_PER)) break;
   const verdicts = await Promise.all(
     bareClaims.flatMap((c) =>
       Array.from({ length: SKEPTICS_PER }, (_, i) =>
@@ -105,11 +122,13 @@ for (let round = 1; round <= MAX_ROUNDS; round++) {
   else noSurvivorRounds = 0;
 
   // ===== stop condition: 2 consecutive no-survivor rounds OR absolute ceiling =====
+  // (empty rounds no longer increment noSurvivorRounds — they are a "nothing new"
+  //  signal, distinct from a no-survivor round; only survivors.length === 0 counts)
   if (noSurvivorRounds >= 2) break;
 }
 
 return {
-  status: roundLog.some((r) => r.survivors > 0) ? 'PARTIAL' : 'PASS',
+  status: roundLog.some((r) => r.survivors > 0) ? 'PASS' : 'PARTIAL', // a surviving claim = active confirmation (canon: unconfirmed → PARTIAL, not PASS)
   completed: [],
   skipped: [],
   findings: roundLog,
@@ -118,4 +137,4 @@ return {
 };
 ```
 
-Four required annotations, marked inline above: **each stage** (Stage A/B/C/D labeled), **truncation point** (Stage B comment), **quorum tally** (Stage D comment), **stop condition** (loop-bottom comment).
+Four required annotations, marked inline above: **each stage** (Stage A/B/C/D labeled), **truncation point** (Stage B comment), **quorum tally** (Stage D comment), **stop condition** (loop-bottom comment). The agent-count cap invariant (Invariant 6) is carried by the `willDispatch` guard before the Stage A and Stage C fan-outs.

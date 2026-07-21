@@ -368,7 +368,10 @@ def self_check() -> None:
         return b""
 
     def _flag(pattern: str) -> bool:
-        return _bash(f'test -f "{_state_expr}/{pattern}" && echo y').strip() == b"y"
+        return (
+            _bash(f'test -f "{_state_expr}/{pattern}" && echo y').strip()
+            == b"y"
+        )
 
     def _clean(sid: str) -> None:
         _bash(
@@ -390,7 +393,9 @@ def self_check() -> None:
         ).encode(),
     )
     assert r["code"] == 2 and r["err"].startswith(b"squads governor-gate:"), r
-    assert not _flag(f"squads-governor-{sid}"), "governor deny must not arm the flag"
+    assert not _flag(f"squads-governor-{sid}"), (
+        "governor deny must not arm the flag"
+    )
     _clean(sid)
 
     # (2) debug-gate: arm via squads:debug, then non-exempt Write denies,

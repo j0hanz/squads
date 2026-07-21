@@ -115,6 +115,57 @@ _LANG_TYPE_REGEXES: dict[str, re.Pattern[str]] = {
     ext: re.compile(pat) for ext, pat in _LANG_TYPE_PATTERNS.items()
 }
 
+# Top-level stdlib module names used later for overlap-scoring filtering.
+# Explicit list (no "etc."); filtering is applied at scoring time, not here.
+_STDLIB_MODULES = frozenset(
+    {
+        "os",
+        "sys",
+        "re",
+        "typing",
+        "json",
+        "pathlib",
+        "collections",
+        "functools",
+        "itertools",
+        "subprocess",
+        "argparse",
+        "dataclasses",
+        "concurrent",
+        "ast",
+        "io",
+        "abc",
+        "enum",
+    }
+)
+
+
+def _stdlib_filter(imports: list[str]) -> list[str]:
+    """Drop stdlib top-level module names from a raw imports list."""
+    return [m for m in imports if m not in _STDLIB_MODULES]
+
+
+# Import patterns for non-.py supported languages. Each regex captures the
+# top-level module name from ABSOLUTE imports only; relative imports are
+# skipped (no match). Compiled once at module load, mirroring _LANG_TYPE_REGEXES.
+_LANG_IMPORT_PATTERNS: dict[str, str] = {
+    # TS/TSX: import/export ... from "pkg/..." — skip "..." (relative) paths.
+    ".ts": r'\b(?:import|export)\b[^;]*?\sfrom\s"([^./][^"]*)"',
+    ".tsx": r'\b(?:import|export)\b[^;]*?\sfrom\s"([^./][^"]*)"',
+    # Go: import "pkg" (single or grouped). Capture first segment of path.
+    ".go": r'\bimport\s+(?:\(\s*)?"([^"]*)"',
+    # Rust: use pkg::...; or extern crate pkg; — skip self/crate/super.
+    ".rs": r"\b(?:use\s+(?!self::|crate::|super::)([\w]+)|extern\s+crate\s+(\w+))",
+    # Top-level package from the dependency statement (first path segment).
+    ".java": r"\bimport\s+(?:static\s+)?([\w]+)",
+    ".cs": r"\busing\s+([\w]+)",
+    ".kt": r"\bimport\s+([\w]+)",
+    ".swift": r"\bimport\s+([\w]+)",
+}
+_LANG_IMPORT_REGEXES: dict[str, re.Pattern[str]] = {
+    ext: re.compile(pat) for ext, pat in _LANG_IMPORT_PATTERNS.items()
+}
+
 # Regex for exported function names in TypeScript/TSX files.
 # Matches: export function foo, export async function foo,
 #          export const foo = (, export const foo: Type = (
@@ -252,7 +303,7 @@ def _git_log(path: str, cwd: Path) -> str:
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
-    except (FileNotFoundError, subprocess.TimeoutExpired):
+    except FileNotFoundError, subprocess.TimeoutExpired:
         return "no history"
     if result.returncode != 0:
         return "no history"
@@ -402,36 +453,46 @@ def _scan_constraints(file_path: Path) -> list[str]:
     return hits
 
 
-def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
-    """Extract named types/classes from source files that match domain nouns.
+def _shapes_from_tree(tree: ast.AST, nouns: set[str]) -> list[str]:
+    """Collect noun-matched interface shapes from a parsed Python AST tree.
 
-    Uses Python AST for .py files; regex patterns for TypeScript, Go, Rust, and others.
+    Priority-ordered: ClassDef (≤3/file) first, then FunctionDef/AsyncFunctionDef
+    (≤2/file combined), then TypeAlias (≤1/file). AnnAssign typed fields are
+    dropped (noisy). Per-file terms[:5] cap applied by the caller's sibling
+    `_shapes_from_text` is mirrored here.
     """
-    suffix = file_path.suffix.lower()
     terms: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ClassDef) and any(
+            noun in node.name.lower() for noun in nouns
+        ):
+            doc = ast.get_docstring(node)
+            entry = node.name + (f" — {doc[:80]}" if doc else "")
+            terms.append(entry)
+    classes = terms[:3]
+    funcs: list[str] = []
+    aliases: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+            noun in node.name.lower() for noun in nouns
+        ):
+            if len(funcs) < 2:
+                funcs.append(node.name)
+        elif (
+            isinstance(node, ast.TypeAlias)
+            and any(noun in node.name.lower() for noun in nouns)
+            and len(aliases) < 1
+        ):
+            aliases.append(node.name)
+    terms = classes + funcs + aliases
+    return terms[:5]
 
-    if suffix == ".py":
-        try:
-            tree = ast.parse(
-                file_path.read_text(encoding="utf-8", errors="ignore")
-            )
-        except (SyntaxError, OSError):
-            return []
-        for node in ast.walk(tree):
-            if isinstance(node, ast.ClassDef) and any(
-                noun in node.name.lower() for noun in nouns
-            ):
-                doc = ast.get_docstring(node)
-                entry = node.name + (f" — {doc[:80]}" if doc else "")
-                terms.append(entry)
-        return terms[:5]
 
+def _shapes_from_text(text: str, suffix: str, nouns: set[str]) -> list[str]:
+    """Regex-based shape extraction for non-.py supported languages."""
+    terms: list[str] = []
     compiled = _LANG_TYPE_REGEXES.get(suffix)
     if not compiled:
-        return []
-    try:
-        text = file_path.read_text(encoding="utf-8-sig", errors="replace")
-    except OSError:
         return []
     for match in compiled.finditer(text):
         name = match.group(1)
@@ -447,6 +508,154 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
                 terms.append(name)
 
     return terms[:5]
+
+
+def _imports_from_tree(tree: ast.AST) -> list[str]:
+    """Collect top-level module names from a parsed Python AST tree.
+
+    Relative imports (level > 0) are skipped. Returns RAW names (no stdlib
+    filtering — that happens at overlap-scoring time).
+    """
+    names: list[str] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                top = alias.name.split(".")[0]
+                if top and top not in names:
+                    names.append(top)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level and node.level > 0:
+                continue  # relative import — skip
+            if node.module:
+                top = node.module.split(".")[0]
+                if top and top not in names:
+                    names.append(top)
+    return names
+
+
+def _imports_from_text(text: str, suffix: str) -> list[str]:
+    """Regex-based top-level import extraction for non-.py supported languages.
+
+    Absolute imports only; relative imports are skipped (no match).
+    """
+    compiled = _LANG_IMPORT_REGEXES.get(suffix)
+    if not compiled:
+        return []
+    names: list[str] = []
+    for match in compiled.finditer(text):
+        # Each pattern's first capture group is the top-level module name
+        # (Rust has two alternation groups; pick whichever matched).
+        top = next((g for g in match.groups() if g), None)
+        if not top:
+            continue
+        # For path-style imports (e.g. TS "pkg/mod"), take the first segment.
+        top = top.split("/")[0].split(":")[0]
+        if top and top not in names:
+            names.append(top)
+    return names
+
+
+def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
+    """Extract named types/classes from source files that match domain nouns.
+
+    Uses Python AST for .py files; regex patterns for TypeScript, Go, Rust,
+    and others. Thin wrapper over `_shapes_from_tree` / `_shapes_from_text`.
+    """
+    # Stat-first size guard: skip files >256 KiB without reading. Replaces
+    # unimplementable win32 wall-time timeout for in-process AST.
+    try:
+        if file_path.stat().st_size > 262144:
+            return []
+    except OSError:
+        return []
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".py":
+        try:
+            tree = ast.parse(
+                file_path.read_text(encoding="utf-8", errors="ignore")
+            )
+        except SyntaxError, OSError:
+            return []
+        return _shapes_from_tree(tree, nouns)
+
+    try:
+        text = file_path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return []
+    return _shapes_from_text(text, suffix, nouns)
+
+
+def _extract_imports(file_path: Path) -> list[str]:
+    """Return top-level module names imported by `file_path`.
+
+    For .py: walks ast.Import/ast.ImportFrom; relative imports (level > 0)
+    are skipped. For other supported languages: regex over file text, absolute
+    imports only. Returns RAW names (no stdlib filtering — that happens at
+    overlap-scoring time). Unsupported extensions and parse errors return [].
+    Thin wrapper over `_imports_from_tree` / `_imports_from_text`.
+    """
+    # Stat-first size guard: same 256 KiB ceiling as _extract_interface_shapes.
+    try:
+        if file_path.stat().st_size > 262144:
+            return []
+    except OSError:
+        return []
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".py":
+        try:
+            tree = ast.parse(
+                file_path.read_text(encoding="utf-8", errors="ignore")
+            )
+        except SyntaxError, OSError:
+            return []
+        return _imports_from_tree(tree)
+
+    try:
+        text = file_path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError:
+        return []
+    return _imports_from_text(text, suffix)
+
+
+def _extract_file_signals(
+    file_path: Path, nouns: set[str]
+) -> tuple[list[str], list[str], str]:
+    """Extract (shapes, imports, parse_error) from a single file in ONE read.
+
+    REQ-005: combined extraction in one read per file.
+    REQ-006: stat-first 256 KiB guard → ([], [], "size > 256KiB") without
+    reading; SyntaxError/OSError → ([], [], str(exc)); success → parse_error == "".
+    """
+    try:
+        if file_path.stat().st_size > 262144:
+            return ([], [], "size > 256KiB")
+    except OSError as exc:
+        return ([], [], str(exc))
+    suffix = file_path.suffix.lower()
+
+    if suffix == ".py":
+        try:
+            text = file_path.read_text(encoding="utf-8", errors="ignore")
+            tree = ast.parse(text)
+        except (SyntaxError, OSError) as exc:
+            return ([], [], str(exc))
+        return (
+            _shapes_from_tree(tree, nouns),
+            _imports_from_tree(tree),
+            "",
+        )
+
+    try:
+        text = file_path.read_text(encoding="utf-8-sig", errors="replace")
+    except OSError as exc:
+        return ([], [], str(exc))
+    return (
+        _shapes_from_text(text, suffix, nouns),
+        _imports_from_text(text, suffix),
+        "",
+    )
 
 
 def _estimate_scope(
@@ -567,11 +776,18 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     # Record analogous features (files found only via adjacent synonyms)
     result.analogous_features = sorted(adjacent_paths)[:_MAX_ANALOGOUS]
 
-    # ── Phase 2: parallel git log + constraints + term extraction + test files ──
-    # Cap workers: phase 2 tasks are bounded by _MAX_FILES (5 files x 4 task types)
+    # ── Phase 2: parallel git log + constraints + shapes+imports + tests ───────
+    # shape+import futures run over matched files (≤5) PLUS adjacent files (≤2)
+    # = 7 total. Adjacent files get the combined future ONLY (no log/constraint/
+    # test futures). Totals: 5 log + 5 constraints + 7 shape+import + 5 tests = 22
+    # tasks on 20 workers (2 queue). _phase2_workers stays _MAX_FILES * 4 = 20.
     _phase2_workers = (
         _MAX_FILES * 4
     )  # 20: 5 files x 4 task types (log, constraints, shapes, tests)
+    adjacent_files = result.analogous_features  # sorted list, ≤2 posix paths
+    file_imports: dict[
+        str, list[str]
+    ] = {}  # per-file RAW imports for TASK-006
     with ThreadPoolExecutor(max_workers=_phase2_workers) as pool:
         log_futures = {
             pool.submit(_git_log, f.path, cwd): f for f in result.related_files
@@ -580,11 +796,15 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             pool.submit(_scan_constraints, cwd / f.path): f.path
             for f in result.related_files
         }
+        # Combined shape+import extraction in one read per file (REQ-005).
+        # Matched files first, then adjacent — dict-insertion order is the
+        # collection order, keeping output deterministic across runs.
+        shape_paths = [f.path for f in result.related_files] + list(
+            adjacent_files
+        )
         shape_futures = {
-            pool.submit(
-                _extract_interface_shapes, cwd / f.path, noun_set
-            ): f.path
-            for f in result.related_files
+            pool.submit(_extract_file_signals, cwd / p, noun_set): p
+            for p in shape_paths
         }
         test_futures = {
             pool.submit(_find_test_file, cwd / f.path, cwd): f
@@ -610,11 +830,17 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
 
         for fut, path in shape_futures.items():
             try:
-                result.interface_shapes.extend(fut.result())
+                shapes, imports, parse_error = fut.result()
             except Exception as exc:
                 result.unknowns.append(
                     f"Error extracting shapes for {path}: {exc}"
                 )
+                continue
+            if parse_error:
+                result.unknowns.append(f"Error parsing {path}: {parse_error}")
+                continue
+            result.interface_shapes.extend(shapes)
+            file_imports[path] = imports
 
         for fut, file_signal in test_futures.items():
             try:
@@ -625,6 +851,33 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
                 result.unknowns.append(
                     f"Error finding test file for {file_signal.path}: {exc}"
                 )
+
+    # Expose per-file imports for TASK-006 (not a dataclass field, so asdict
+    # JSON output is unaffected). Matched + adjacent files are keyed here.
+    result.file_imports = file_imports
+
+    # ── TASK-006: rank synonym-adjacent candidates by import-overlap ───────────
+    # Import-overlap is a RANKING signal over the synonym-adjacent pool
+    # (adjacent_paths), NOT a separate pool. The x2 synonym weight is dropped
+    # (dead logic). Candidates beyond the ≤2 processed in the pool are absent
+    # from file_imports → empty imports → overlap 0. The (-overlap, path) key
+    # is total-order, so output never depends on PYTHONHASHSEED.
+    matched_filtered_imports: set[str] = set()
+    for f in result.related_files:
+        matched_filtered_imports.update(
+            _stdlib_filter(result.file_imports.get(f.path, []))
+        )
+    ranked = sorted(
+        adjacent_paths,
+        key=lambda c: (
+            -len(
+                set(_stdlib_filter(result.file_imports.get(c, [])))
+                & matched_filtered_imports
+            ),
+            c,
+        ),
+    )
+    result.analogous_features = ranked[:_MAX_ANALOGOUS]
 
     # ── Scope signal ─────────────────────────────────────────────────────────
     crosses_boundary = len(matched_modules) > 1

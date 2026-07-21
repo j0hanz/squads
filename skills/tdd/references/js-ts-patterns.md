@@ -11,11 +11,11 @@ metadata:
 
 ## Basic RED-GREEN Cycle
 
-Two RED states: `Cannot find module` is environment RED — stub the module until the failure becomes an assertion failure (`Expected: 90, Received: 0`), the correct RED to implement against. See the Failure Analysis table below for the full mapping.
+Two RED states: `Cannot find module` is environment RED — stub module until failure become assertion failure (`Expected: 90, Received: 0`), correct RED to implement against. See Failure Analysis table below for full mapping.
 
 ## Describe/It Nesting (when to use)
 
-Use `describe` only to group tests for the **same unit** — not to batch tests for different behaviors:
+Use `describe` only to group tests for **same unit** — not batch tests for different behaviors:
 
 ```typescript
 // RIGHT: describe groups tests for one function
@@ -36,7 +36,7 @@ describe('discount module', () => {
 
 ## Async Functions
 
-For async code, the TDD loop is the same — just use `async/await` in tests:
+Async code, TDD loop same — just use `async/await` in tests:
 
 ```typescript
 // RED first
@@ -46,7 +46,7 @@ test('fetches user by id', async () => {
 });
 ```
 
-**Important:** Async tests that never await silently pass. Always verify the test reaches the assertion:
+**Important:** Async tests that never await silently pass. Always verify test reaches assertion:
 
 ```typescript
 // WRONG — the promise is never awaited; the test returns synchronously with zero
@@ -65,22 +65,22 @@ test('fetches user', async () => {
 });
 ```
 
-> **Vitest/Mocha:** `expect.assertions` is Jest-only. In Vitest, await the promise directly (`await expect(fetchUser('u-123')).resolves.toEqual(...)`) so an un-awaited rejection fails the run.
+> **Vitest/Mocha:** `expect.assertions` is Jest-only. In Vitest, await promise directly (`await expect(fetchUser('u-123')).resolves.toEqual(...)`) so un-awaited rejection fails run.
 
 ## TypeScript: Type Errors as a Form of RED
 
-A type error is a valid RED state — treat it like an AssertionError: missing property → environment fix; wrong return type → implementation fix. Never add `// @ts-ignore` to bypass a type failure; fix the type as you would a failing assertion.
+Type error valid RED state — treat like AssertionError: missing property → environment fix; wrong return type → implementation fix. Never add `// @ts-ignore` to bypass type failure; fix type like failing assertion.
 
 ## Mocking at System Boundaries Only
 
-Apply SKILL.md's mocking rule in Jest terms: `jest.mock('./httpClient')` (external HTTP boundary) is RIGHT; `jest.mock('./userRepository')` (internal collaborator) is WRONG — test the real thing.
+Apply SKILL.md mocking rule in Jest terms: `jest.mock('./httpClient')` (external HTTP boundary) RIGHT; `jest.mock('./userRepository')` (internal collaborator) WRONG — test real thing.
 
 ## Failure Analysis in JavaScript
 
 | Failure message                               | Type        | Action                                                 |
 | --------------------------------------------- | ----------- | ------------------------------------------------------ |
-| `Cannot find module './foo'`                  | Environment | Create the module with a stub export                   |
-| `foo is not a function`                       | Environment | Add the missing export                                 |
-| `Expected X, received undefined`              | Logic       | Function returned wrong value — fix impl               |
+| `Cannot find module './foo'`                  | Environment | Create module with stub export                         |
+| `foo is not a function`                       | Environment | Add missing export                                     |
+| `Expected X, received undefined`              | Logic       | Function return wrong value — fix impl                 |
 | `Expected: true, Received: false`             | Logic       | Wrong boolean logic — fix condition                    |
 | `TypeError: Cannot read property 'x' of null` | Unexpected  | Debug — may be flawed test setup or missing null guard |

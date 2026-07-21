@@ -1,6 +1,6 @@
 # Annotated `debug-verify` example script
 
-Reference-only — illustrative, not a shipped artifact. A representative `debug-verify` workflow script carrying the six required invariants / four required annotations as inline comments.
+Look-only. Show thing, not real tool. `debug-verify` script have six rules / four marks as words inside.
 
 ```javascript
 // debug-verify.js — illustrative, not shipped. Read-only class.
@@ -137,4 +137,4 @@ return {
 };
 ```
 
-Four required annotations, marked inline above: **each stage** (Stage A/B/C/D labeled), **truncation point** (Stage B comment), **quorum tally** (Stage D comment), **stop condition** (loop-bottom comment). The agent-count cap invariant (Invariant 6) is carried by the `willDispatch` guard before the Stage A and Stage C fan-outs.
+Four marks above: **each stage** (Stage A/B/C/D mark), **truncation point** (Stage B word), **quorum tally** (Stage D word), **stop condition** (loop-bottom word). Agent-count rule (Invariant 6) live in `willDispatch` guard before Stage A and Stage C.

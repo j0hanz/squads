@@ -9,7 +9,7 @@ metadata:
 
 # Minimal Implementation: Domain-Specific Patterns
 
-The principle: implement exactly what the test requires, nothing more. Examples are Python; translate the shape to your stack.
+Rule: do only what test want, no more. Python shown, make fit own stack.
 
 ## Math Functions: Direct Formula
 
@@ -28,7 +28,7 @@ def calculate_discount(price, discount_percent):
     return price * (1 - discount_percent / 100)
 ```
 
-Add the validation when its test arrives.
+Add check when test for check come.
 
 ## Validation Functions: Simple Boolean Check
 
@@ -46,7 +46,7 @@ def validate_email(self, email):
     return bool(re.match(r'^[^@]+@[^@]+\.[^@]+$', email))
 ```
 
-Add the regex when the RFC-compliance test arrives.
+Add regex when RFC test come.
 
 ## Parsing / String Processing: Iterate As Needed
 
@@ -65,7 +65,7 @@ def parse(self, data):
     return [line.split(',') for line in data.split('\n')]
 ```
 
-Each feature gets its own test and minimal implementation.
+Each feature get own test and small code.
 
 ## Classes: Extract Helpers Only On Duplication
 
@@ -93,4 +93,4 @@ def _contains_required_character(self, text, char):
     return char in text
 ```
 
-Extract only when actual duplication appears — not "just in case".
+Make helper only when code copy-paste happen � not "just in case".

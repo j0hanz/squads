@@ -1,59 +1,40 @@
 ---
 name: squads
-description: Index/map of the squads skill set. Not a workflow — invoke to see the topology, then route to the right skill. For routing a concrete task to a workflow, use dispatch-agents (the request router); this skill is the conventions/map index.
+description: Use when you need the squads skill map — route triggers, pipeline order, contract owners. Not a workflow; concrete tasks go to dispatch-agents.
 disable-model-invocation: true
 user-invocable: false
 ---
 
 # squads
 
-Index map of squads skills. Not workflow — invoke see topology, route to right skill. Route concrete task to workflow? Use [dispatch-agents](../dispatch-agents/SKILL.md) (request router). This skill convention map index.
+Router card. Every concrete task enters [dispatch-agents](../dispatch-agents/SKILL.md) Step 0 Governor first — it picks inline vs composed and routes over this map.
 
-## Naming rule
+## Route
 
-| Class             | Pattern    | Skills                                  |
-| :---------------- | :--------- | :-------------------------------------- |
-| Pipeline          | plain noun | `brainstorm`, `plan`, `debug`, `review` |
-| Fan-out execution | verb-noun  | `dispatch-agents`, `forge-workflow`     |
-| Grandfathered     | acronym    | `tdd`                                   |
+| Trigger                                                              | Skill                                          |
+| :------------------------------------------------------------------- | :--------------------------------------------- |
+| Any new task/request; APPROVED `docs/plan/*.plan.md`; doubt          | [dispatch-agents](../dispatch-agents/SKILL.md) |
+| Vague requirements, open solution space, ≥2 architectural approaches | [brainstorm](../brainstorm/SKILL.md)           |
+| Named feature needing plan/spec; plan/specs pair to validate         | [plan](../plan/SKILL.md)                       |
+| Single new logic behavior; TDD red flag                              | [tdd](../tdd/SKILL.md)                         |
+| Test, `Validate:`, or runtime fails unexpectedly — before any fix    | [debug](../debug/SKILL.md)                     |
+| Verified diff to review; review feedback to resolve                  | [review](../review/SKILL.md)                   |
+| Bulk/recurring fan-out, whole-repo audit, saved `/command` workflow  | [forge-workflow](../forge-workflow/SKILL.md)   |
 
-New pipeline skills take plain noun. New fan-out execution skills take verb-noun. Fan-out semantics live in skill `description:` frontmatter, not name.
+Pipeline: `brainstorm → plan → dispatch-agents → {tdd | debug} → review → (FAIL re-fix → dispatch-agents)`. `forge-workflow` orthogonal — composed/bulk runs and saved `/command` workflows, fed by Governor Composition Specs.
 
-## Routing DAG
+Each skill's `## Next Skills` table owns its outgoing edges; on conflict, skill table wins — update this card to match.
 
-```mermaid
-flowchart LR
-  brainstorm --> plan
-  plan --> dispatch
-  dispatch --> tdd
-  dispatch --> debug
-  tdd --> review
-  debug --> review
-  review -->|FAIL re-fix| dispatch
-  forge[forge-workflow] -. orthogonal .-> pipeline
-```
+## Contracts
 
-`brainstorm → plan → dispatch-agents → {tdd | debug} → review → (FAIL re-fix → dispatch-agents)`. `forge-workflow` orthogonal (saved `/command` workflows for recurring/large fan-out).
+| Contract                                            | Owner                                                                                          |
+| :-------------------------------------------------- | :--------------------------------------------------------------------------------------------- |
+| Handoff Contract (subagent return)                  | [dispatch-agents #handoff-contract](../dispatch-agents/SKILL.md#handoff-contract)              |
+| Dispatch invariants                                 | [dispatch-agents #invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) |
+| Model & fan-out policy (flat `haiku`, 5-min budget) | [dispatch-agents #model--fan-out-policy](../dispatch-agents/SKILL.md#model--fan-out-policy)    |
+| Pattern Canon, quorum, recipes                      | [forge-workflow #pattern-canon](../forge-workflow/SKILL.md#pattern-canon)                      |
+| `<untrusted_context>` wrap convention               | [plan #step-1-discovery](../plan/SKILL.md#step-1-discovery)                                    |
 
-**Authoritative source:** each skill `## Next Skills` table authoritative for outgoing edges. This DAG overview. If disagree, skill table wins — update this DAG to match.
+## Naming
 
-## Shared contracts
-
-| Contract                                                | Owner (anchor)                                                                                                                  |
-| :------------------------------------------------------ | :------------------------------------------------------------------------------------------------------------------------------ |
-| Handoff Contract (subagent → main-thread return struct) | [dispatch-agents/SKILL.md#handoff-contract](../dispatch-agents/SKILL.md#handoff-contract)                                       |
-| Invariants (apply every dispatch)                       | [dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) |
-| `<untrusted_context>` wrap convention                   | [plan/SKILL.md](../plan/SKILL.md) Step 1 Discovery                                                                              |
-| Fan-out scaling (many small agents, flat 5-min budget)  | [dispatch-agents/SKILL.md](../dispatch-agents/SKILL.md) Model & fan-out policy                                                  |
-
-## Next Skills
-
-| Skill                                          | Use Case                                                                |
-| :--------------------------------------------- | :---------------------------------------------------------------------- |
-| [dispatch-agents](../dispatch-agents/SKILL.md) | Route concrete task/request to workflow (request router)                |
-| [brainstorm](../brainstorm/SKILL.md)           | Vague requirements, open solution space, ≥2 architectural approaches    |
-| [plan](../plan/SKILL.md)                       | Draft plan/spec, or validate existing plan                              |
-| [tdd](../tdd/SKILL.md)                         | Single new logic behavior, or TDD red flag                              |
-| [debug](../debug/SKILL.md)                     | Test, `Validate:`, or runtime fail unexpectedly — before fix            |
-| [review](../review/SKILL.md)                   | Fresh-eye review of verified diff, or resolve review feedback           |
-| [forge-workflow](../forge-workflow/SKILL.md)   | Bulk independent items, whole-repo audit, or saved `/command` workflows |
+Pipeline skills: plain noun (`brainstorm`, `plan`, `debug`, `review`). Fan-out execution: verb-noun (`dispatch-agents`, `forge-workflow`). `tdd` grandfathered. Fan-out semantics live in `description:` frontmatter, never the name.

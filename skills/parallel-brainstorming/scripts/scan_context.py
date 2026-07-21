@@ -247,6 +247,8 @@ def _git_log(path: str, cwd: Path) -> str:
             ["git", "log", "--oneline", f"-{_MAX_LOG_LINES}", "--", path],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
@@ -264,6 +266,8 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
             ["git", "grep", "-ril", "-e", pattern],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
@@ -303,6 +307,8 @@ def _grep_files(pattern: str, cwd: Path) -> list[str] | None:
             ],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
@@ -510,7 +516,11 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
 
         match_counts: Counter[str] = Counter()
         for noun, fut in grep_futures:
-            paths = fut.result()
+            try:
+                paths = fut.result()
+            except Exception:
+                search_failed.append(noun)
+                continue
             if paths is None:
                 search_failed.append(noun)
                 continue
@@ -520,7 +530,11 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
         result.related_files = [FileSignal(path=p) for p in ranked]
 
         for noun, fut in adjacent_futures:
-            paths = fut.result()
+            try:
+                paths = fut.result()
+            except Exception:
+                search_failed.append(noun)
+                continue
             if paths is None:
                 search_failed.append(noun)
                 continue

@@ -1,7 +1,7 @@
 ---
 name: forge-workflow
 description: Use when a bulk or fan-out job is recurring or big enough to warrant a saved `/command` workflow, or when debug needs the debug-verify recipe. Not for one-off small fleets — use dispatch-agents.
-argument-hint: '<feature description or recipe name>'
+argument-hint: '<job shape, recipe name, or Composition Spec>'
 ---
 
 # forge-workflow
@@ -20,7 +20,7 @@ Every generated script embeds these six invariants — mechanical, enforced by s
 
 4. **`args` parameterization with declared defaults.** Every workflow reads `args` at top and declares a default for every field. Smoke-slice runs the same script with small `args`; production scales by overriding `args` only. No hardcoded counts, prompts, or paths in stage bodies.
 
-5. **Model: `haiku`, per the [Model & fan-out policy](../dispatch-agents/SKILL.md#model--fan-out-policy).** Every stage sets `model: 'haiku'`; unavailable → inherit session model. No per-stage tier routing, no promote/demote. `CLAUDE_CODE_SUBAGENT_MODEL` still overrides all.
+5. **Model: `haiku`, per the [Model & fan-out policy](../dispatch-agents/SKILL.md#model--fan-out-policy).** Every stage sets `model: 'haiku'`; param unavailable or tier unknown -> omit (inherit session model) AND emit `[WARN] model param unavailable — agents inherit session model; flat-haiku cost model void` — never a silent degrade. No per-stage tier routing, no promote/demote (see the anchor). `CLAUDE_CODE_SUBAGENT_MODEL` still overrides all.
 
 6. **Agent-count cap per recipe.** Each recipe archetype declares its default agent scale in the Recipe Catalog. The script computes total dispatches and aborts before exceeding the cap, logging the truncation — silent caps read as full coverage. Cap declared per archetype, never improvised per run.
 

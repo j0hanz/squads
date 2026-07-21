@@ -1,24 +1,20 @@
 ---
 name: dispatch-agents
-description: Use when any new task or user request arrives, before other skills. Also use to execute an APPROVED docs/plan/*.plan.md. Not for design ideation itself — use brainstorm.
+description: Use to execute an APPROVED docs/plan/*.plan.md, or to size and run a bulk/fan-out fleet — the Governor picks inline vs composed. Not a mandatory first hop; route lifecycle work (failure, diff, feature, problem) directly to its skill.
 argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 ---
 
 # dispatch-agents
 
-## Step 0: Governor — invoked first, before any other skill
+## Step 0: Governor — sizes the fleet, picks inline vs composed
 
-Every task starts here. Governor checks preflight, picks mode via the Threshold Table, then routes: inline (fixed routing table) for small/no-runtime work, or composed (Composition Spec for forge-workflow) for big/fan-out work. No build, no plan, no fix before Governor says go. The hook enforces this where it can: `squads-hook.sh` `governor-gate` denies any other squads skill invocation until dispatch-agents has been invoked once this session (best-effort — it cannot catch a turn that never calls the Skill tool).
+dispatch-agents runs when a task needs fan-out: an APPROVED `docs/plan/*.plan.md` to execute, a bulk or whole-repo job, or a fleet the router sent here. The Governor checks preflight, picks mode via the Threshold Table — inline (fixed routing table) for small/no-runtime work, composed (Composition Spec for forge-workflow) for big/fan-out work — and sizes the fleet.
 
-dispatch-agents routing tables are canonical; the squads card mirrors — on mismatch, dispatch-agents wins.
+Lifecycle work (a failure, a diff, a feature, a problem) routes straight to its skill from the session `<squads-router>` block — dispatch-agents is NOT a mandatory first hop, and no hook forces it. If a lifecycle task lands here anyway, hand it off per the routing table below. The `<squads-router>` block is the operative router; the table below adds the fleet shape for work that runs here.
 
 ### Preflight (first gate)
 
 Native dynamic workflows are a hard dependency for composed mode. Check per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight). Any fail → composed OFF, inline only. No silent degrade inside forge.
-
-### Hook-fire probe (observability, REQ-OBS)
-
-Governor itself — MAIN-THREAD, never a subagent (hub-and-spoke; subagents can't dispatch subagents or see main-thread hook stdout) — makes one Agent call whose prompt contains the literal unresolved placeholder `probe {{squads-hook-probe}}`. Expected: call **DENIED** by PreToolUse with a `squads dispatch-check:` message naming the placeholder. Deny seen → say "hook fire confirmed (deny observed)", continue. Call goes through (subagent replies) → hook NOT firing; say "hook not observable for live tool calls — file-state guards (the `pre-tool` debug-gate flag) are best-effort only", continue — never silently assume guards fire. The probe MUST expect a deny, not an `ok` line: clean dispatch is silent BY DESIGN — `squads-hook.sh` `dispatch-check` writes nothing on a clean pass and only ever emits a deny (stderr, exit 2). A denied call never runs, so the probe is free. Probe once per context window: a prior probe verdict visible in this conversation ("hook fire confirmed" or "hook not observable") stands — skip the probe and restate the standing verdict in one line. Re-probe only when a fresh `<squads-router>` injection has appeared since the last verdict (startup, resume, clear, and compact each re-run the session-start hook). The conversation is the cache — no hook or file state involved.
 
 <!-- do not rename: skills link #governor-threshold-table -->
 
@@ -50,7 +46,7 @@ Classify the request (first match wins), route to workflow, pick fleet shape.
 | APPROVED `docs/plan/*.plan.md` in hand                                                  | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                                       |
 | Single new logic behavior, no plan needed, or TDD red flag                              | [tdd](../tdd/SKILL.md)                                                              | One worker; review supplies fresh eyes                                                                                                                                                                                                                         |
 | Test, `Validate:` command, or runtime fails unexpectedly — before any fix               | [debug](../debug/SKILL.md)                                                          | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                               |
-| Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve  | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                             |
+| Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve  | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 2 fresh read-only reviewers, distinct lenses, union findings. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                           |
 | Recurring bulk (any size), whole-repo audit, or unbiased judging of this context's work | [forge-workflow](../forge-workflow/SKILL.md) (generate a native `/<name>` workflow) | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                         |
 
 Two rows fit? Earlier wins by lifecycle: ideation before planning, planning before execution; failure reproduced (debug) before fix (tdd) regardless of row order. One-shot edits and simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size → go smaller; every fan-out multiplies token cost.
@@ -140,7 +136,7 @@ Pattern shapes, quorum, loop ceilings live in [forge-workflow](../forge-workflow
 
 ### Model & fan-out policy
 
-- **Model:** every dispatched agent uses `model: 'haiku'` where the Agent tool exposes the param — every stage, every role. Param unavailable or tier unknown → omit (inherit session model). No cheap/strong/strongest tiers, no promote/demote escalation.
+- **Model:** every dispatched agent uses `model: 'haiku'` where the Agent tool exposes the param — every stage, every role. Param unavailable or tier unknown → omit (inherit session model) AND say so once (`[WARN] model param unavailable — agents inherit session model; flat-haiku cost model void`), never a silent degrade. No cheap/strong/strongest tiers, no promote/demote escalation.
 - **Verification depth = prompt instruction, never model tier** — say "think carefully, verify before answering" or "quick best-effort, one pass" in the prompt. Never swap model to buy quality.
 - Timeout, concurrency, reads-parallel/writes-serial: see [Invariants](#invariants--apply-to-every-dispatch) — stated once there.
 

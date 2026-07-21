@@ -1,21 +1,21 @@
 ---
 name: squads
-description: Use when you need the squads skill map — route triggers, pipeline order, contract owners. Not a workflow; concrete tasks go to dispatch-agents.
+description: Use when you need the squads skill map — route triggers, pipeline order, contract owners. Not a workflow; it routes each task to the skill that owns it.
 disable-model-invocation: true
 user-invocable: false
 ---
 
 # squads
 
-Router card. Every concrete task enters [dispatch-agents](../dispatch-agents/SKILL.md) Step 0 Governor first — it picks inline vs composed and routes over this map.
+Router card. Each task routes by first match **directly** to the skill that owns it — mirrors the session `<squads-router>` block; no mandatory first hop. [dispatch-agents](../dispatch-agents/SKILL.md) is one destination among these, for fan-out: bulk/audit work and APPROVED plans, where its Governor picks inline vs composed and sizes the fleet.
 
 ## Route
 
-dispatch-agents routing tables are canonical; the squads card mirrors — on mismatch, dispatch-agents wins.
+This card and the session `<squads-router>` block are the router; the dispatch-agents table adds fleet shapes for work that runs there. Keep them in sync — on conflict, the owning skill's `## Next Skills` table wins.
 
 | Trigger                                                                                               | Skill                                          |
 | :---------------------------------------------------------------------------------------------------- | :--------------------------------------------- |
-| Any new task/request; APPROVED `docs/plan/*.plan.md`; doubt                                           | [dispatch-agents](../dispatch-agents/SKILL.md) |
+| Bulk/fan-out/whole-repo audit; APPROVED `docs/plan/*.plan.md`; fleet sizing                           | [dispatch-agents](../dispatch-agents/SKILL.md) |
 | Problem to explore, no deliverable shape yet                                                          | [brainstorm](../brainstorm/SKILL.md)           |
 | Request names a deliverable artifact (plan/spec/doc for a named feature); plan/specs pair to validate | [plan](../plan/SKILL.md)                       |
 | Single new logic behavior; TDD red flag                                                               | [tdd](../tdd/SKILL.md)                         |

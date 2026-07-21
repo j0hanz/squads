@@ -17,12 +17,12 @@ Self-test: perf-hook.py --self-check
 
 Record shape (fields omitted when absent; exit omitted when 0):
 
-    {"ts":"14:03:22","rule":"pre-tool","ms":41,"exit":2,"tool":"Skill",
-     "skill":"squads:debug","session":"abc12345",
-     "err":"squads governor-gate: ..."}
+    {"ts":"14:03:22","rule":"pre-tool","ms":41,"exit":2,"tool":"Write",
+     "skill":"","session":"abc12345",
+     "err":"squads debug-gate: ..."}
 
 exit 2 + the "squads <gate>:" err prefix names the guard that fired
-(governor-gate, debug-gate, dispatch-check, plan-schema); post-tool exit 2
+(debug-gate, dispatch-check, plan-schema); post-tool exit 2
 with no prefix is plan-schema feedback, not a deny. "timeout":1 marks a rule
 killed at CHILD_TIMEOUT and failed open — the R2 residual hooks.json documents.
 """
@@ -43,7 +43,7 @@ ERR_MAX = 160
 # 8s < the 10s pre/post/dispatch entries, 4s < the 5s session-start entry.
 CHILD_TIMEOUT = 8
 SESSION_START_TIMEOUT = 4
-GATES = ("governor-gate", "debug-gate", "dispatch-check", "plan-schema")
+GATES = ("debug-gate", "dispatch-check", "plan-schema")
 
 
 def log_dir() -> Path:
@@ -292,14 +292,14 @@ def self_check() -> None:
     denied = build_record(
         "pre-tool",
         {
-            "tool_name": "Skill",
-            "tool_input": {"skill": "squads:debug"},
+            "tool_name": "Write",
+            "tool_input": {"file_path": "src/x.go"},
             "session_id": "abcdef123456",
         },
         {
             "code": 2,
             "out": b"",
-            "err": b"squads governor-gate: dispatch-first\nmore",
+            "err": b"squads debug-gate: debug is active\nmore",
             "ms": 7,
             "timeout": False,
         },
@@ -310,12 +310,11 @@ def self_check() -> None:
         "rule": "pre-tool",
         "ms": 7,
         "exit": 2,
-        "tool": "Skill",
-        "skill": "squads:debug",
+        "tool": "Write",
         "session": "abcdef12",
-        "err": "squads governor-gate: dispatch-first",
+        "err": "squads debug-gate: debug is active",
     }, denied
-    assert gate_of(denied) == "governor-gate"
+    assert gate_of(denied) == "debug-gate"
     assert (
         gate_of({"exit": 2, "rule": "post-tool", "err": "plan missing"})
         == "feedback"
@@ -378,14 +377,12 @@ def self_check() -> None:
         )
 
     def _clean(sid: str) -> None:
-        _bash(
-            f'rm -f "{_state_expr}/squads-governor-{sid}"'
-            f' "{_state_expr}/squads-debug-gate-{sid}"'
-        )
+        _bash(f'rm -f "{_state_expr}/squads-debug-gate-{sid}"')
 
-    # (1) governor-gate: squads:debug with no governor flag → deny. pre-tool
-    # arms nothing now (arming is post-tool), so neither flag appears.
-    sid = "schk-gov"
+    # (1) lifecycle skills route directly now — a Skill call with no flag set
+    # passes at pre-tool (governor-gate removed; debug-gate matches edits, not
+    # Skill). pre-tool arms nothing (arming is post-tool).
+    sid = "schk-route"
     _clean(sid)
     r = run_rule(
         "pre-tool",
@@ -397,45 +394,17 @@ def self_check() -> None:
             }
         ).encode(),
     )
-    assert r["code"] == 2 and r["err"].startswith(b"squads governor-gate:"), r
-    assert not _flag(f"squads-governor-{sid}"), (
-        "pre-tool must not arm governor"
-    )
-    assert not _flag(f"squads-debug-gate-{sid}"), (
-        "denied skill must not arm debug"
-    )
+    assert r["code"] == 0 and r["err"] == b"", r
+    assert not _flag(f"squads-debug-gate-{sid}"), "pre-tool must not arm debug"
     _clean(sid)
 
-    # (2) post-tool arms/lifts, pre-tool denies. dispatch-agents (post-tool) arms
-    # governor; squads:debug then clears governor at pre-tool WITHOUT arming debug
-    # (pre-tool no longer arms); post-tool squads:debug arms it; a non-exempt Write
-    # denies, an exempt *.md passes; post-tool squads:tdd lifts it. Flags live in
-    # the hook's bash state_dir, so every touch/lift is routed through the real
-    # dispatcher, not fabricated in Python.
+    # (2) post-tool arms/lifts the debug gate; pre-tool denies edits while it is
+    # up. post-tool squads:debug arms it; a non-exempt Write denies, an exempt
+    # *.md passes; post-tool squads:tdd lifts it. Flags live in the hook's bash
+    # state_dir, so every touch/lift is routed through the real dispatcher, not
+    # fabricated in Python.
     sid = "schk-dbg"
     _clean(sid)
-    r = run_rule(
-        "post-tool",
-        json.dumps(
-            {
-                "tool_name": "Skill",
-                "tool_input": {"skill": "squads:dispatch-agents"},
-                "session_id": sid,
-            }
-        ).encode(),
-    )
-    assert r["code"] == 0 and _flag(f"squads-governor-{sid}"), r
-    r = run_rule(
-        "pre-tool",
-        json.dumps(
-            {
-                "tool_name": "Skill",
-                "tool_input": {"skill": "squads:debug"},
-                "session_id": sid,
-            }
-        ).encode(),
-    )
-    assert r["code"] == 0 and not _flag(f"squads-debug-gate-{sid}"), r
     r = run_rule(
         "post-tool",
         json.dumps(

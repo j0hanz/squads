@@ -10,7 +10,7 @@ Seven skills, each with a single job, that hand off along one lifecycle:
 
 - **brainstorm**: explore a vague or open problem before any plan exists.
 - **plan**: draft a plan or spec, then validate it before execution (draft / validate modes).
-- **dispatch-agents**: triages every incoming request first, selects the multi-agent workflow, and executes approved plans across agent fleets.
+- **dispatch-agents**: sizes and runs a fan-out fleet — bulk/audit work and approved plans — picking inline vs composed. Not a mandatory first hop; lifecycle work routes directly to its skill.
 - **tdd**: implement new logic test-first; flags tests written after the code.
 - **debug**: reproduce and isolate an unexpected failure before fixing it.
 - **review**: get a fresh-eye review on a diff, then resolve the feedback (request / resolve modes).
@@ -29,7 +29,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 
 ## Usage
 
-On every session start, clear, and compact, the `squads-router` block (inlined as a literal string in the `session-start` arm of `hooks/squads-hook.sh`) is injected automatically and routes each task through `dispatch-agents`, whose Governor selects the right workflow by first match. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
+On every session start, clear, and compact, the `squads-router` block (inlined as a literal string in the `session-start` arm of `hooks/squads-hook.sh`) is injected automatically and routes each task **by first match directly to the skill that owns it** — no mandatory first hop. Fan-out and bulk work, plus approved plans, go to `dispatch-agents`, whose Governor picks inline vs composed and sizes the fleet. Invoke any skill explicitly through the Skill tool, namespaced as `squads:<name>`:
 
 ```text
 /squads:brainstorm  "add offline mode to the editor"
@@ -37,12 +37,12 @@ On every session start, clear, and compact, the `squads-router` block (inlined a
 /squads:tdd                    "parse a duration string into seconds"
 ```
 
-When unsure which skill fits, invoke `dispatch-agents` — its Governor picks for you, preferring upstream (brainstorm or plan) over executing or reviewing.
+When unsure which skill fits, the injected `squads-router` names the first-match route (preferring upstream — brainstorm or plan — over executing or reviewing); for a fan-out or bulk job, `dispatch-agents` sizes the fleet.
 
 ### Lifecycle
 
 ```text
-user request → dispatch-agents (Governor: pick workflow + fleet)
+user request → squads-router: first match, invoke the skill directly
   ├─ open problem  → brainstorm → plan (draft) → plan (validate) ─┐
   ├─ clear feature → plan (draft) → plan (validate) ─┬────────────────────────┘
   │                                                  └→ dispatch-agents (multi-task) / tdd (single task)
@@ -52,7 +52,7 @@ user request → dispatch-agents (Governor: pick workflow + fleet)
   └─ verified diff → review (request) → review (resolve) → commit / PR
 ```
 
-> **Platform requirement**: native dynamic workflows are a hard dependency — Claude Code (CC) ≥ 2.1.154, paid plan required.
+> **Platform requirement**: composed mode — forge-workflow scripts, the `debug-verify` quorum, and large fan-out — needs native dynamic workflows (Claude Code ≥ 2.1.154, paid plan). Without them the plugin still runs **inline**: lifecycle skills, small fleets, and single-thread debug all work, but the mechanically-enforced composed path is off — `debug` degrades to single-thread reproduce-and-isolate (no skeptic quorum) and bulk fan-out stays inline. You get the process discipline, not the in-runtime enforcement.
 
 ## Development
 

@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus three deterministic guards: dispatch placeholder hygiene (the Governor's hook-fire probe expects the dispatch-check deny), the governor gate (dispatch-first: lifecycle skills denied until dispatch-agents ran this session), and the debug hard gate + plan schema on the edit path, plus the post-tool rule (PostToolUse: arms/lifts the governor and debug flags on Skill so a rejected Skill call never mutates state, and surfaces plan-schema feedback after writes/edits). One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated. Every entry routes through perf-hook.py, a transparent timing wrapper (stdout/stderr/exit passthrough; one JSONL line per fire in ~/.claude/squads-perf; `perf-hook.py report` summarizes) that falls back to the bare dispatcher when neither python nor python3 is present — python is tried before python3 so a working Windows `python` is never shadowed by a python3-only path; if/else, not ||, because a deny's exit 2 would trigger || and run the rule twice.",
+  "description": "Session router injection plus two deterministic guards: dispatch placeholder hygiene (deny an unresolved {{...}} placeholder in a dispatch body) and the debug hard gate + plan schema on the edit path, plus the post-tool rule (PostToolUse: arms/lifts the debug flag on Skill so a rejected Skill call never mutates state, and surfaces plan-schema feedback after writes/edits). One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated. Every entry routes through perf-hook.py, a transparent timing wrapper (stdout/stderr/exit passthrough; one JSONL line per fire in ~/.claude/squads-perf; `perf-hook.py report` summarizes) that falls back to the bare dispatcher when neither python nor python3 is present — python is tried before python3 so a working Windows `python` is never shadowed by a python3-only path; if/else, not ||, because a deny's exit 2 would trigger || and run the rule twice.",
   "hooks": {
     "SessionStart": [
       {
@@ -25,7 +25,7 @@
         ]
       },
       {
-        "matcher": "Skill|Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",

@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus three deterministic guards: dispatch placeholder hygiene (the Governor's hook-fire probe expects the dispatch-check deny), the governor gate (dispatch-first: lifecycle skills denied until dispatch-agents ran this session), and the debug hard gate + plan schema on the edit path, plus the post-tool feedback rule (PostToolUse surfaces governor feedback after writes/edits). One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.",
+  "description": "Session router injection plus three deterministic guards: dispatch placeholder hygiene (the Governor's hook-fire probe expects the dispatch-check deny), the governor gate (dispatch-first: lifecycle skills denied until dispatch-agents ran this session), and the debug hard gate + plan schema on the edit path, plus the post-tool feedback rule (PostToolUse surfaces governor feedback after writes/edits). One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated. Every entry routes through perf-hook.py, a transparent timing wrapper (stdout/stderr/exit passthrough; one JSONL line per fire in ~/.claude/squads-perf; `perf-hook.py report` summarizes) that falls back to the bare dispatcher when python is absent — if/else, not ||, because a deny's exit 2 would trigger || and run the rule twice.",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start",
+            "command": "if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" session-start; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start; fi",
             "timeout": 5
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check",
+            "command": "if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" dispatch-check; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check; fi",
             "timeout": 10
           }
         ]
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool",
+            "command": "if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" pre-tool; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool; fi",
             "timeout": 10
           }
         ]
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" post-tool",
+            "command": "if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" post-tool; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" post-tool; fi",
             "timeout": 10
           }
         ]

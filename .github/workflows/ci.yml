@@ -1,0 +1,27 @@
+name: ci
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run format:check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install ruff pytest
+      - run: ruff check .
+      - run: python -m pytest
+      - name: shellcheck
+        run: shellcheck -S warning hooks/squads-hook.sh skills/review/scripts/resolve-base.sh skills/forge-workflow/references/plant-breach-drill.sh

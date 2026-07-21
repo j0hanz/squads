@@ -13,15 +13,15 @@ Router card. Each task routes by first match **directly** to the skill that owns
 
 This card and the session `<squads-router>` block are the router; the dispatch-agents table adds fleet shapes for work that runs there. Keep them in sync — on conflict, the owning skill's `## Next Skills` table wins.
 
-| Trigger                                                                                               | Skill                                          |
-| :---------------------------------------------------------------------------------------------------- | :--------------------------------------------- |
-| Bulk/fan-out/whole-repo audit; APPROVED `docs/plan/*.plan.md`; fleet sizing                           | [dispatch-agents](../dispatch-agents/SKILL.md) |
-| Problem to explore, no deliverable shape yet                                                          | [brainstorm](../brainstorm/SKILL.md)           |
-| Request names a deliverable artifact (plan/spec/doc for a named feature); plan/specs pair to validate | [plan](../plan/SKILL.md)                       |
-| Single new logic behavior; TDD red flag                                                               | [tdd](../tdd/SKILL.md)                         |
-| Test, `Validate:`, or runtime fails unexpectedly — before any fix                                     | [debug](../debug/SKILL.md)                     |
-| Verified diff to review; review feedback to resolve                                                   | [review](../review/SKILL.md)                   |
-| Recurring bulk (any size), whole-repo audit, saved `/command` workflow                                | [forge-workflow](../forge-workflow/SKILL.md)   |
+| Trigger                                                                                                                   | Skill                                          |
+| :------------------------------------------------------------------------------------------------------------------------ | :--------------------------------------------- |
+| Bulk/fan-out/whole-repo audit; APPROVED `docs/plan/*.plan.md`; fleet sizing                                               | [dispatch-agents](../dispatch-agents/SKILL.md) |
+| Problem to explore, no deliverable shape yet                                                                              | [brainstorm](../brainstorm/SKILL.md)           |
+| Request names a deliverable artifact (plan/spec/doc for a named feature); plan/specs pair to validate                     | [plan](../plan/SKILL.md)                       |
+| Single new logic behavior; TDD red flag                                                                                   | [tdd](../tdd/SKILL.md)                         |
+| Test, `Validate:`, or runtime fails unexpectedly — before any fix                                                         | [debug](../debug/SKILL.md)                     |
+| Verified diff to review; review feedback to resolve                                                                       | [review](../review/SKILL.md)                   |
+| Saved `/command` workflow (recurring bulk big enough to forge once); debug-verify recipe is reached via `debug`, not here | [forge-workflow](../forge-workflow/SKILL.md)   |
 
 Pipeline: `brainstorm → plan → dispatch-agents → {tdd | debug} → review → (FAIL → review resolve, re-review ≤ 2)`. `forge-workflow` orthogonal — composed/bulk runs and saved `/command` workflows, fed by Governor Composition Specs.
 
@@ -34,7 +34,8 @@ Each skill's `## Next Skills` table owns its outgoing edges; on conflict, skill 
 | Handoff Contract (subagent return)                  | [dispatch-agents #handoff-contract](../dispatch-agents/SKILL.md#handoff-contract)              |
 | Dispatch invariants                                 | [dispatch-agents #invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) |
 | Model & fan-out policy (flat `haiku`, 5-min budget) | [dispatch-agents #model--fan-out-policy](../dispatch-agents/SKILL.md#model--fan-out-policy)    |
-| Pattern Canon, quorum, recipes                      | [forge-workflow #pattern-canon](../forge-workflow/SKILL.md#pattern-canon)                      |
+| Pattern Canon, quorum                               | [forge-workflow #pattern-canon](../forge-workflow/SKILL.md#pattern-canon)                      |
+| Recipe Catalog                                      | [forge-workflow #recipe-catalog](../forge-workflow/SKILL.md#recipe-catalog)                    |
 | `<untrusted_context>` wrap convention               | [plan #step-1-discovery](../plan/SKILL.md#step-1-discovery)                                    |
 
 ## Naming

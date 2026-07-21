@@ -10,7 +10,7 @@ plugin installed via `/plugin marketplace add j0hanz/squads`, not an npm
 package. If new steps show up that this file doesn't cover, update this file
 rather than reinventing them ad hoc.
 
-## Files that carry the version (all 3, kept in sync)
+## Files that carry the version (all 4, kept in sync)
 
 | File                              | Field                                        |
 | --------------------------------- | -------------------------------------------- |
@@ -32,16 +32,17 @@ git log <last-tag>..HEAD --oneline       # commits since then
 
 ## Steps
 
-1. **Bump** all 3 files to the same `<NEW>` version.
-2. **Verify** (scope to the 3 manifests — `package-lock.json` also carries the version and would inflate the count):
+1. **Bump** the three manifests to the same `<NEW>` version, then sync the lockfile: `npm install --package-lock-only` (rewrites both version fields in `package-lock.json` from `package.json`).
+2. **Verify** (the 3 manifests are scoped together; `package-lock.json` is verified separately — 2 occurrences):
    ```bash
    git grep -n "\"version\": \"<NEW>\"" -- package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json   # must print exactly 3 lines
    git grep -n "\"version\": \"<OLD>\"" -- package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json   # must print zero
+   git grep -c "\"version\": \"<NEW>\"" -- package-lock.json   # must print 2
    ```
 3. **Validate**: run exactly `claude plugin validate . --strict` — must pass before committing.
-4. **Commit** (stage only the 3 version files):
+4. **Commit** (stage only the 4 version files):
    ```bash
-   git add package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json
+   git add package.json package-lock.json .claude-plugin/plugin.json .claude-plugin/marketplace.json
    git commit -m "chore: bump version to <NEW>"
    ```
 5. **Tag**: `git tag -a v<NEW> -m "Version <NEW>"`.
@@ -55,4 +56,4 @@ git log <last-tag>..HEAD --oneline       # commits since then
 - `npm publish` — not npm-distributed.
 - CHANGELOG.md / changelog-generation script — doesn't exist here.
 - Discord release notification — doesn't exist here.
-- `plugin/`, `.codex-plugin/`, `openclaw/` manifests — this repo doesn't have them; only the 3 files in the table above.
+- `plugin/`, `.codex-plugin/`, `openclaw/` manifests — this repo doesn't have them; only the 4 files in the table above.

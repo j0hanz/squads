@@ -126,6 +126,17 @@ Resolve code review feedback from human, bot, or subagent.
    - **Post-fix test run FAILS** — fix wrong or root cause misunderstood; hand off to [debug](../debug/SKILL.md) to reproduce and re-isolate. Don't iterate blind in Step 3.
    - **Re-review FAIL again on 3rd pass** — mark **BLOCKED**, escalate to user, stop; else loop back to Step 1 with the new feedback.
 
+### Step 5: Post-merge teardown (optional, user-gated)
+
+After the user confirms the PR merged, delete the lifecycle artifacts the pipeline created for this work. Only delete git-tracked docs — a tracked doc survives the deletion in history (per [plan](../plan/SKILL.md) finalize), an untracked one would be lost. Brainstorm's `.wip-*` are already deleted at brief-write time (brainstorm Phase 6), so they are out of scope here.
+
+1. Confirm the PR merged (`gh pr view <n> --json state` shows `MERGED`, or the user confirms) before deleting anything. PR not merged -> stop, do nothing.
+2. For each `docs/plan/<name>.plan.md` and matching `docs/plan/<name>.specs.md` this work produced: assert git-tracked (`git ls-files --error-unmatch <path>`); untracked -> stop and report (do not delete — plan's recoverability contract requires tracked). Tracked -> `git rm <plan-path> <specs-path>`.
+3. Optionally remove the source design brief `docs/design/<topic>-design.md` once the work is shipped and no longer referenced — same tracked-only guard.
+4. Commit: `git commit -m "chore(docs): teardown plan/specs for <name>"`. Do not push unless the user asks.
+
+**Done when:** merged PR confirmed; tracked plan/specs pair removed in a teardown commit (or explicitly skipped with a reason); no untracked doc deleted.
+
 ## Next Skills
 
 | Skill                      | Use Case                                                  |

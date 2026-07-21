@@ -296,7 +296,7 @@ session_start() {
     hooks_json="$(dirname "${BASH_SOURCE[0]}")/hooks.json"
     # Banner enumerates ALL hook events (SessionStart/PreToolUse/PostToolUse/SubagentStop/
     # SessionEnd), not just PreToolUse. Degrade silently if hooks.json is missing/corrupt.
-    jq -r '(.hooks | to_entries[]) | .key as $evt | .value[] | . as $p | .hooks[] | "squads hooks wired: \(.args[1] // .command | sub("^.*/hooks/"; "") | sub("[^A-Za-z-].*$"; "")) [\($p.matcher // "-")] [\($evt)]"' "$hooks_json" 2>/dev/null || true
+    jq -r '(.hooks | to_entries[]) | .key as $evt | .value[] | . as $p | .hooks[] | "squads hooks wired: \(.command | sub("^.*squads-hook\\.sh\" "; "")) [\($p.matcher // "-")] [\($evt)]"' "$hooks_json" 2>/dev/null || true
   fi
 
   local router='Route every incoming task or user request to [dispatch-agents](../dispatch-agents/SKILL.md); its Step 0 Governor classifies the request (first match wins) and picks the workflow + fleet shape. Skip only for pure conversation or a one-shot edit answerable direct.'

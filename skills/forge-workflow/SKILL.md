@@ -1,6 +1,6 @@
 ---
 name: forge-workflow
-description: Use when a bulk or fan-out job is recurring or large enough to warrant a saved `/command` workflow, or when parallel-debugging needs the debug-verify recipe. Not for one-off small fleets — dispatch-agents handles those inline.
+description: Use when a bulk or fan-out job is recurring or large enough to warrant a saved `/command` workflow, or when debug needs the debug-verify recipe. Not for one-off small fleets — dispatch-agents handles those inline.
 argument-hint: '<feature description or recipe name>'
 ---
 
@@ -26,7 +26,7 @@ Every generated script embeds these six invariants. They are mechanical, not pro
 
 ## Pattern Canon
 
-This is the single source for the six orchestration shapes and the unified quorum rule. dispatch-agents and parallel-debugging cite these anchors; they do not duplicate.
+This is the single source for the six orchestration shapes and the unified quorum rule. dispatch-agents and debug cite these anchors; they do not duplicate.
 
 Pick first fit; compose when the task demands it.
 
@@ -53,7 +53,7 @@ Abstain counts as 0.5 refutation toward threshold. A finding not actively confir
 
 Canonical composition: **fan out → adversarially verify each finding → loop until 2 consecutive rounds find nothing new** (dedupe-empty). The adversarial-verify variant used by `debug-verify` instead stops on 2 consecutive **no-survivor** rounds (all claims refuted), since its hypotheses are fixed at invocation. Dedupe against everything already seen (including rejected findings) by `file:line` between rounds, or it never converges. The debug-verify variant uses a minimum floor of 4 — its 2-consecutive-no-survivor stop is unreachable at ceil(N/2) < 2 (N ≤ 2), so a floor makes the stop condition fire.
 
-Exploring _design approaches_ isn't a Generate & filter job — [parallel-brainstorming](../parallel-brainstorming/SKILL.md) governs there; ideation phases forbid subagents.
+Exploring _design approaches_ isn't a Generate & filter job — [brainstorm](../brainstorm/SKILL.md) governs there; ideation phases forbid subagents.
 
 ## Recipe Catalog
 
@@ -69,7 +69,7 @@ Each recipe maps an archetype to a composition, a default agent scale, an `args`
 | `loop-until-done`    | rounds of fan-out → dedupe by `file:line` → ceiling                 | 4 rounds, 5 agents/round   | `{seed, rubric, max_rounds?}`                         | read-only |
 | `debug-verify`       | per-hyp investigators → bare-claim trunc → skeptics → quorum → loop | N hypotheses × 2 skeptics  | `{hypotheses: [], repro_cmd, failing_output, rubric}` | read-only |
 
-**`debug-verify`** is consumed by [parallel-debugging](../parallel-debugging/SKILL.md) at its Step 2 (invoke debug-verify): investigators spawn one per hypothesis (blind), the script truncates each finding to `root cause is <X> at <file:line>, classified as <logic|design-level>` in code before skeptics read it, skeptics spawn with distinct refutation angles per claim, the canonical quorum table tallies each round, loops dedupe by `(file:line, classification)`, stop on 2 consecutive no-survivor rounds or the ceiling, and return round log + survivors + refutation trail in [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) shape. It is strictly read-only class — see below.
+**`debug-verify`** is consumed by [debug](../debug/SKILL.md) at its Step 2 (invoke debug-verify): investigators spawn one per hypothesis (blind), the script truncates each finding to `root cause is <X> at <file:line>, classified as <logic|design-level>` in code before skeptics read it, skeptics spawn with distinct refutation angles per claim, the canonical quorum table tallies each round, loops dedupe by `(file:line, classification)`, stop on 2 consecutive no-survivor rounds or the ceiling, and return round log + survivors + refutation trail in [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) shape. It is strictly read-only class — see below.
 
 ### Read-only class
 
@@ -77,10 +77,10 @@ A recipe is **read-only class** when no stage's `agent()` prompt permits file wr
 
 ## Next Skills
 
-| Skill                                                | Use Case                                                                  |
-| :--------------------------------------------------- | :------------------------------------------------------------------------ |
-| [dispatch-agents](../dispatch-agents/SKILL.md)       | Governor and one-off small fleets; cites this canon for shapes and quorum |
-| [parallel-debugging](../parallel-debugging/SKILL.md) | Consumes the `debug-verify` recipe and the canonical quorum table         |
+| Skill                                          | Use Case                                                                  |
+| :--------------------------------------------- | :------------------------------------------------------------------------ |
+| [dispatch-agents](../dispatch-agents/SKILL.md) | Governor and one-off small fleets; cites this canon for shapes and quorum |
+| [debug](../debug/SKILL.md)                     | Consumes the `debug-verify` recipe and the canonical quorum table         |
 
 ## Procedure
 
@@ -91,7 +91,7 @@ Forge runs one session-scoped pass per workflow. Steps are sequential; each gate
 3. **Recipe** — pick the catalog row; carry its composition, default scale, `args` signature, and fetch-or-edit class forward. Reject at forge time any recipe that duplicates an approved lifecycle mandate (plan draft/validate, tdd RED-GREEN, review 2-pass) — see § Script Audit Checklist.
 4. **Native codegen** — emit a `.claude/workflows/<name>.js` script that embeds the six Generation Contract invariants. Every stage is a distinct `agent()` call with a Handoff-Contract `schema`; `args` with defaults at the top; every stage's `model: 'haiku'` per [Model & fan-out policy](../dispatch-agents/SKILL.md#model--fan-out-policy); agent-count cap computed and asserted.
 5. **Script Audit Checklist** — run the checklist (see § Script Audit Checklist). HIGH items gate save; failed HIGH items block save.
-6. **Smoke-slice run** — execute the same script with a small `args` slice. A failed smoke-slice blocks save. Re-run after fixes; do not proceed until green. Auto-mode (spec path): a failed smoke-slice retries once; a second failure FAILs out to parallel-debugging.
+6. **Smoke-slice run** — execute the same script with a small `args` slice. A failed smoke-slice blocks save. Re-run after fixes; do not proceed until green. Auto-mode (spec path): a failed smoke-slice retries once; a second failure FAILs out to debug.
 7. **Name check against the `/` command namespace** — before save, confirm `<name>` does not collide with an existing slash command (built-in or plugin). Collision → ask user to rename (Auto-mode / spec path: auto-suffix instead, never block on a prompt).
 8. **Save ask-before-overwrite** — if `.claude/workflows/<name>.js` already exists, ask before overwriting; never overwrite silently (Auto-mode / spec path: auto-suffix instead, never overwrite).
 9. **CATALOG.md append** — append a row to `docs/workflows/CATALOG.md` (name, recipe, `args` signature, scale, fetch/edit class, last-verified date).

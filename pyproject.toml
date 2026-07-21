@@ -27,7 +27,7 @@ ignore = []
 docstring-code-format = true
 
 [tool.pytest.ini_options]
-testpaths = ["skills/parallel-brainstorming/scripts/tests"]
+testpaths = ["skills/brainstorm/scripts/tests"]
 
 [dependency-groups]
 dev = [

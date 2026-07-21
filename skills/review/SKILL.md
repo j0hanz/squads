@@ -118,11 +118,11 @@ Resolve code review feedback received from a human, bot, or subagent.
      - Prompt the user before push or opening a PR. On confirm: `git push -u origin <branch>` then `gh pr create` with body = the `Change summary:` line. If resolve mode was entered WITHOUT a prior dispatch (no Change summary in hand), derive the PR body and commit message from `git log` of the commits being pushed (e.g. `git log --format=%s -n1 <base>..<head>`) — state this fallback explicitly.
      - If `gh` fails (not installed / not authed), report the failure verbatim and stop — no silent skip. The commit + push already succeeded by the time `gh` runs.
      - No user to ask (autonomous invocation) → stop after commit and report; no push, no PR. A fresh review wanted → hand off to request mode (re-review pass N).
-   - **Post-fix test run FAILS** — the fix is wrong or the root cause was misunderstood; hand off to [parallel-debugging](../parallel-debugging/SKILL.md) to reproduce and re-isolate before re-fixing. Don't iterate blind in Step 3.
+   - **Post-fix test run FAILS** — the fix is wrong or the root cause was misunderstood; hand off to [debug](../debug/SKILL.md) to reproduce and re-isolate before re-fixing. Don't iterate blind in Step 3.
    - **Re-review came back FAIL again** — 3rd pass, mark **BLOCKED**, escalate to the user, stop; else loop back to Step 1 with the new feedback.
 
 ## Next Skills
 
-| Skill                                                | Use Case                                                  |
-| :--------------------------------------------------- | :-------------------------------------------------------- |
-| [parallel-debugging](../parallel-debugging/SKILL.md) | Post-fix test run fails — reproduce/isolate before re-fix |
+| Skill                      | Use Case                                                  |
+| :------------------------- | :-------------------------------------------------------- |
+| [debug](../debug/SKILL.md) | Post-fix test run fails — reproduce/isolate before re-fix |

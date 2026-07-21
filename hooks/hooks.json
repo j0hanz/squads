@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus two deterministic guards: dispatch placeholder hygiene (the Governor's hook-fire probe expects the dispatch-check deny) and the parallel-debugging hard gate + plan schema on the edit path. One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.",
+  "description": "Session router injection plus two deterministic guards: dispatch placeholder hygiene (the Governor's hook-fire probe expects the dispatch-check deny) and the debug hard gate + plan schema on the edit path. One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.",
   "hooks": {
     "SessionStart": [
       {

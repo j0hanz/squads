@@ -1,6 +1,6 @@
 ---
 name: tdd
-description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Prefer parallel-debugging when the failure is in existing code, not fresh behavior.
+description: Use when new logic requires implementation, or a TDD red flag appears — trivially passing test, code before its test, or GREEN with no observed RED. Prefer debug when the failure is in existing code, not fresh behavior.
 argument-hint: '[feature or behavior to implement]'
 ---
 
@@ -23,12 +23,12 @@ Escape hatches from the HARD GATE. Never self-invoke one silently — confirm vi
 
 ## Autonomous invocation (approved-plan handoff)
 
-When invoked by `plan` (validate mode)/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `parallel-debugging` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
+When invoked by `plan` (validate mode)/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or by `debug` (a minimal repro as the RED test), skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, and the reproducing case are already locked. Derive the interface/behavior and test path from the handoff, state them in one line, and enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply unchanged.
 
 Per-origin delta:
 
 - **`plan`/`dispatch-agents`:** derive interface, error conditions, and test path from the task block's `Action:`, `Satisfies:` (REQ text), `Files:`, and `Validate:`.
-- **`parallel-debugging`:** derive the behavior under test from the repro and its verbatim failing output; skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure, so run the repro test against the existing code and confirm RED.
+- **`debug`:** derive the behavior under test from the repro and its verbatim failing output; skip Step 1 sub-step 2 (stub) — the implementation already exists and is the source of the failure, so run the repro test against the existing code and confirm RED.
 
 ## Step 0: Confirm Scope
 
@@ -52,7 +52,7 @@ _For an approved-plan handoff, derive these from the task block instead of askin
 - Provide 2-3 call-site examples.
 - State the target test file path.
 - Start the **behavior list**: happy path + the enumerated errors; it grows by one edge case per RED cycle and is the coverage gauge for REFACTOR.
-- **Gate:** run the relevant existing tests first — establish a clean baseline before adding new tests. If the baseline is RED, stop: route the pre-existing failure to `parallel-debugging`, or get user confirmation to proceed with the failing tests recorded and excluded from this cycle's GREEN criterion.
+- **Gate:** run the relevant existing tests first — establish a clean baseline before adding new tests. If the baseline is RED, stop: route the pre-existing failure to `debug`, or get user confirmation to proceed with the failing tests recorded and excluded from this cycle's GREEN criterion.
 
 **Done when:** interface details, errors, and test path are locked and the user confirms.
 
@@ -62,7 +62,7 @@ _If JavaScript/TypeScript, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/references/js-
 _CLAUDE_PLUGIN_ROOT is valid here because the plugin root contains skills/, so the harness-loaded path resolves._
 
 1.1. Write the smallest test for one behavior.
-1.2. Stub the implementation (e.g. `return null`) — just enough to compile/run. (Skip in `parallel-debugging` autonomous handoff — implementation already exists; see that paragraph in this skill.)
+1.2. Stub the implementation (e.g. `return null`) — just enough to compile/run. (Skip in `debug` autonomous handoff — implementation already exists; see that paragraph in this skill.)
 1.3. Run the test.
 1.4. **Gate:** confirm FAILURE. A test that passes immediately tests nothing — delete and rewrite it.
 
@@ -75,7 +75,7 @@ _If unsure how minimal is minimal, read `${CLAUDE_PLUGIN_ROOT}/skills/tdd/refere
 1. Checkpoint the working tree before editing.
 2. Write the smallest implementation that satisfies the test — no speculative generality.
 3. No code added "just in case" — only what the current test requires.
-4. 3 failed attempts on the same test → escalate directly to `parallel-debugging` (reproduce and re-isolate the root cause) or [plan](../plan/SKILL.md) (if the design itself is wrong).
+4. 3 failed attempts on the same test → escalate directly to `debug` (reproduce and re-isolate the root cause) or [plan](../plan/SKILL.md) (if the design itself is wrong).
 
 ### N-1 Test (False-Green Elimination)
 
@@ -120,10 +120,10 @@ Any of these means you've left TDD — the fix is the same every time. Don't arg
 
 ## Next Skills
 
-On full behavior-list coverage and a clean REFACTOR, run the full test suite one final time and report the results. If the final run fails: a failure in the behavior just built re-enters the cycle at RED; an unrelated new failure routes to `parallel-debugging`. Never report done over a failing suite.
+On full behavior-list coverage and a clean REFACTOR, run the full test suite one final time and report the results. If the final run fails: a failure in the behavior just built re-enters the cycle at RED; an unrelated new failure routes to `debug`. Never report done over a failing suite.
 
-| Skill                                                | Use Case                                                       |
-| :--------------------------------------------------- | :------------------------------------------------------------- |
-| [review](../review/SKILL.md)                         | Fresh-eye review of the completed diff                         |
-| [parallel-debugging](../parallel-debugging/SKILL.md) | Stuck GREEN (Step 2 escalation) or unrelated final-run failure |
-| [plan](../plan/SKILL.md)                             | Design itself proved wrong mid-cycle                           |
+| Skill                        | Use Case                                                       |
+| :--------------------------- | :------------------------------------------------------------- |
+| [review](../review/SKILL.md) | Fresh-eye review of the completed diff                         |
+| [debug](../debug/SKILL.md)   | Stuck GREEN (Step 2 escalation) or unrelated final-run failure |
+| [plan](../plan/SKILL.md)     | Design itself proved wrong mid-cycle                           |

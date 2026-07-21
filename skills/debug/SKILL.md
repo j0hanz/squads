@@ -1,14 +1,14 @@
 ---
-name: parallel-debugging
+name: debug
 description: Use when a test, Validate command, or runtime behavior fails unexpectedly — before any fix. Prefer over tdd when the bug must be reproduced and isolated, not implemented fresh.
 argument-hint: '[symptom: failing test, command, or error]'
 ---
 
-# parallel-debugging
+# debug
 
 **HARD GATE:** No code Edit or fix text before sibling skill invoked — observe failure on minimal repro first. Edit framed as investigator work, repro confirmation, or exploration still violation; fix unverifiable against repro is guess.
 
-## When NOT to use parallel-debugging
+## When NOT to use debug
 
 Route out instead of debugging:
 
@@ -36,7 +36,7 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 
 ## Step 0: Triage
 
-1. Apply When NOT to use parallel-debugging routing above. Bug-vs-missing-feature boundary: reachable code path exists for reported input but produces wrong output or crashes, that's bug, proceed Step 1; no reachable code path, that's missing feature, route out. When in doubt, classify as bug and reproduce — missing-feature route must not be used to avoid reproduction.
+1. Apply When NOT to use debug routing above. Bug-vs-missing-feature boundary: reachable code path exists for reported input but produces wrong output or crashes, that's bug, proceed Step 1; no reachable code path, that's missing feature, route out. When in doubt, classify as bug and reproduce — missing-feature route must not be used to avoid reproduction.
 2. If triage ambiguous, ask user via `AskUserQuestion` (max 2 questions).
 
 **Done when:** failure classified as bug in existing code with one-line justification citing existing reachable path, skill proceeds — or routed to sibling with reason.

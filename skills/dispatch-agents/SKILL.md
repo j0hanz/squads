@@ -1,6 +1,6 @@
 ---
 name: dispatch-agents
-description: Use when any new task or user request arrives, before other skills. Also use to execute an APPROVED docs/plan/*.plan.md. Not for design ideation itself — use parallel-brainstorming.
+description: Use when any new task or user request arrives, before other skills. Also use to execute an APPROVED docs/plan/*.plan.md. Not for design ideation itself — use brainstorm.
 argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 ---
 
@@ -38,15 +38,15 @@ Consulted only once mode = inline. Classify the request (first match wins), rout
 
 | Incoming request                                                                       | Workflow                                                                            | Fleet decision                                                                                                                                                                                                                                                 |
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vague requirements, open solution space, ≥2 distinct architectural approaches          | [parallel-brainstorming](../parallel-brainstorming/SKILL.md)                        | None — ideation phases forbid subagents                                                                                                                                                                                                                        |
+| Vague requirements, open solution space, ≥2 distinct architectural approaches          | [brainstorm](../brainstorm/SKILL.md)                                                | None — ideation phases forbid subagents                                                                                                                                                                                                                        |
 | Clear feature or change needing a plan or spec                                         | [plan](../plan/SKILL.md) (draft → validate modes)                                   | Sized by [plan §Fan-out Scaling](../plan/SKILL.md#fan-out-scaling) — lens × slice ideators (sketch 0), chunked critics — sketch skips validate, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per plan Step 5 |
 | APPROVED `docs/plan/*.plan.md` in hand                                                 | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                                       |
 | Single new logic behavior, no plan needed, or TDD red flag                             | [tdd](../tdd/SKILL.md)                                                              | One worker; review supply fresh eyes                                                                                                                                                                                                                           |
-| Test, `Validate:` command, or runtime fail unexpectedly — before any fix               | [parallel-debugging](../parallel-debugging/SKILL.md)                                | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                               |
+| Test, `Validate:` command, or runtime fail unexpectedly — before any fix               | [debug](../debug/SKILL.md)                                                          | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                               |
 | Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                             |
 | Bulk independent items, whole-repo audit, or unbiased judging of this context's work   | [forge-workflow](../forge-workflow/SKILL.md) (generate a native `/<name>` workflow) | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                         |
 
-Two rows fit? Earlier wins by lifecycle: ideation before planning, planning before execution. A failure is reproduced (parallel-debugging) before it is fixed (tdd), regardless of row order. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiplies token cost.
+Two rows fit? Earlier wins by lifecycle: ideation before planning, planning before execution. A failure is reproduced (debug) before it is fixed (tdd), regardless of row order. One-shot edits, simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size, go smaller; every fan-out multiplies token cost.
 
 ### Governor output struct
 
@@ -88,7 +88,7 @@ An inline dispatch returning `status=PARTIAL`, or a non-empty `skipped[]`, offer
 
 ### Auto-mode (spec path, no human)
 
-Name collision (file overwrite OR `/` command namespace) → auto-suffix, never overwrite. Skip the first-use starters. Smoke-slice fail → retry once → second fail FAILs out to parallel-debugging.
+Name collision (file overwrite OR `/` command namespace) → auto-suffix, never overwrite. Skip the first-use starters. Smoke-slice fail → retry once → second fail FAILs out to debug.
 
 ## Invariants — apply to every dispatch
 
@@ -107,7 +107,7 @@ Name collision (file overwrite OR `/` command namespace) → auto-suffix, never 
 
 <!-- do not rename: skills link #handoff-contract and #invariants--apply-to-every-dispatch -->
 
-Canonical definition for every subagent→main-thread return. Every dispatched subagent MUST return exactly these keys — a return missing `status` or `findings` is treated as FAIL (discard, retry once, then route to parallel-debugging):
+Canonical definition for every subagent→main-thread return. Every dispatched subagent MUST return exactly these keys — a return missing `status` or `findings` is treated as FAIL (discard, retry once, then route to debug):
 
 ```
 status:    PASS | FAIL | PARTIAL
@@ -143,12 +143,12 @@ When [plan](../plan/SKILL.md) (validate mode) hands off an APPROVED `docs/plan/<
 
 - **`Depends on:` sets order.** Dispatch a task only after its dependencies complete and validate; tasks with no path between them may run parallel.
 - **`Files:` decides parallel vs. serial.** Overlapping lists → serial (or isolated worktrees); disjoint → parallel safe. Reads-parallel/writes-serial, per task.
-- **`Validate:` is the structured return.** Each worker runs the task's `Validate:` command and reports exit code + output — a task that doesn't pass isn't done. Pass: `STATUS: PASS — Validate: <cmd> exit 0; files: <list>`. Fail/partial: full structured return with `file:line` findings (see Invariants). A failed `Validate:` from an impl bug (not a plan error) routes to `parallel-debugging` — reproduce/isolate the root cause before re-fixing; a genuinely wrong plan routes to `plan`.
+- **`Validate:` is the structured return.** Each worker runs the task's `Validate:` command and reports exit code + output — a task that doesn't pass isn't done. Pass: `STATUS: PASS — Validate: <cmd> exit 0; files: <list>`. Fail/partial: full structured return with `file:line` findings (see Invariants). A failed `Validate:` from an impl bug (not a plan error) routes to `debug` — reproduce/isolate the root cause before re-fixing; a genuinely wrong plan routes to `plan`.
 - **`Satisfies:` goes into the worker's spec.** Worker gets the REQ-NNN IDs and matching REQ text blocks from `specs.md` — knows the acceptance criterion, not just the action.
 
 Update task status only on state transitions (pending→in_progress at start, in_progress→completed at `Validate:` pass) — not after every sub-step.
 
-**Done when:** every task dispatched in dependency order returns a passing `Validate:` exit code, or a failing task routes to `parallel-debugging` (impl bug) / `plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint — no separate run file.
+**Done when:** every task dispatched in dependency order returns a passing `Validate:` exit code, or a failing task routes to `debug` (impl bug) / `plan` (plan error). On a resumed/crashed session, re-read the plan and re-run each task's `Validate:` in dependency order — pass = done, fail = redispatch; git history (workers commit per milestone) plus `Validate:` is the checkpoint — no separate run file.
 
 ### Execution recipe (one small task per agent)
 
@@ -173,15 +173,15 @@ For multi-milestone work, three roles — all three inherit the flat policy, see
 2. **Workers** implement per file overlap (reads-parallel/writes-serial): overlap → serial, one at a time, each committing so the next inherits clean state; disjoint → parallel, each in its own `git worktree` (main thread creates worktrees, dispatches in one message, merges branches back serially). **Idempotent commits:** the orchestrator records the pre-work SHA for each worker before dispatch; on retry, the worker MUST `git reset --hard <sha>` before re-applying changes — never append to a partial commit.
 3. **Validators** — who never saw the code — check each milestone in a single pass that runs both the static suite (tests, types, lint, review) and the end-to-end behavior exercise (actually run the thing).
 
-**Done when:** each milestone passes that single-pass validation; a failing milestone routes to parallel-debugging (impl bug) or plan (plan error).
+**Done when:** each milestone passes that single-pass validation; a failing milestone routes to debug (impl bug) or plan (plan error).
 
 ## Next Skills
 
-| Skill                                                        | Use Case                                                                             |
-| :----------------------------------------------------------- | :----------------------------------------------------------------------------------- |
-| [parallel-brainstorming](../parallel-brainstorming/SKILL.md) | Vague requirements, open solution space, ≥2 architectural approaches                 |
-| [plan](../plan/SKILL.md)                                     | Draft a plan/spec, or validate an existing pair (contract/blueprint)                 |
-| [tdd](../tdd/SKILL.md)                                       | Single new logic behavior, or a TDD red flag                                         |
-| [parallel-debugging](../parallel-debugging/SKILL.md)         | Test, `Validate:`, or runtime fail unexpectedly — before any fix                     |
-| [review](../review/SKILL.md)                                 | Fresh-eye review of a verified diff, or resolve review feedback                      |
-| [forge-workflow](../forge-workflow/SKILL.md)                 | Bulk independent items, whole-repo audit, or unbiased judging of this context's work |
+| Skill                                        | Use Case                                                                             |
+| :------------------------------------------- | :----------------------------------------------------------------------------------- |
+| [brainstorm](../brainstorm/SKILL.md)         | Vague requirements, open solution space, ≥2 architectural approaches                 |
+| [plan](../plan/SKILL.md)                     | Draft a plan/spec, or validate an existing pair (contract/blueprint)                 |
+| [tdd](../tdd/SKILL.md)                       | Single new logic behavior, or a TDD red flag                                         |
+| [debug](../debug/SKILL.md)                   | Test, `Validate:`, or runtime fail unexpectedly — before any fix                     |
+| [review](../review/SKILL.md)                 | Fresh-eye review of a verified diff, or resolve review feedback                      |
+| [forge-workflow](../forge-workflow/SKILL.md) | Bulk independent items, whole-repo audit, or unbiased judging of this context's work |

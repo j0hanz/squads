@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when the user asks for a plan, spec, or design doc for a named feature or change, or when an existing plan/specs pair needs validation before execution. Not when two or more architectural approaches are in play — use parallel-brainstorming first. Not for sketch-depth validation.
+description: Use when the user asks for a plan, spec, or design doc for a named feature or change, or when an existing plan/specs pair needs validation before execution. Not when two or more architectural approaches are in play — use brainstorm first. Not for sketch-depth validation.
 argument-hint: '[--depth sketch|contract|blueprint] <feature description> | <plan-path> [specs-path]'
 ---
 

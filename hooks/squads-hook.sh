@@ -8,7 +8,7 @@
 #                   placeholders in dispatch bodies (the Governor's hook-fire probe
 #                   expects exactly this deny; a clean dispatch is silent by design)
 #   pre-tool        PreToolUse Skill|Write|Edit|MultiEdit|NotebookEdit — debug-gate
-#                   (parallel-debugging HARD GATE) then plan-schema (Write to a
+#                   (debug HARD GATE) then plan-schema (Write to a
 #                   docs/plan/*.plan.md)
 #
 # `set -uo pipefail` WITHOUT `-e` is intentional: grep/find return non-zero
@@ -78,7 +78,7 @@ dispatch_check() {
 
 # ---------- pre-tool ----------
 
-# parallel-debugging HARD GATE: while that skill is active, non-test/non-md edits are
+# debug HARD GATE: while that skill is active, non-test/non-md edits are
 # denied until the root cause is routed to tdd / plan / review (which lifts the flag).
 # dispatch-agents is NOT a lift — it bypasses reproduce-first. Per-session flag file,
 # 120-min expiry backstop.
@@ -91,7 +91,7 @@ debug_gate() { # debug_gate <hook-input-json>
     Skill)
       skill=$(jq -r '.tool_input.skill // ""' <<<"$input" 2>/dev/null)
       case "$skill" in
-        squads:parallel-debugging | parallel-debugging) touch "$flag" ;;
+        squads:debug | debug) touch "$flag" ;;
         squads:tdd | tdd | squads:plan | plan | squads:review | review) rm -f "$flag" ;;
       esac
       ;;
@@ -103,7 +103,7 @@ debug_gate() { # debug_gate <hook-input-json>
       fi
       file_path=$(jq -r '.tool_input.file_path // .tool_input.notebook_path // ""' <<<"$input" 2>/dev/null)
       is_exempt_path "$(basename "${file_path//\\//}")" ||
-        deny debug-gate "parallel-debugging is active — its HARD GATE forbids code edits before the root cause is reproduced and routed to tdd (logic bug) or plan (design-level); review also lifts. If debugging was abandoned, remove $flag."
+        deny debug-gate "debug is active — its HARD GATE forbids code edits before the root cause is reproduced and routed to tdd (logic bug) or plan (design-level); review also lifts. If debugging was abandoned, remove $flag."
       ;;
   esac
   return 0

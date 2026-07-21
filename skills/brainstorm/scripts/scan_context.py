@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Parallel codebase scanner for parallel-brainstorming Phase 1.
+Parallel codebase scanner for brainstorm Phase 1.
 
 Replaces sequential Glob/Grep/git-log tool calls with one script invocation.
 Returns a JSON Codebase Context Report on stdout.
@@ -665,7 +665,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Parallel codebase scanner for parallel-brainstorming Phase 1"
+        description="Parallel codebase scanner for brainstorm Phase 1"
     )
     parser.add_argument(
         "nouns", nargs="+", help="Domain nouns from the feature description"

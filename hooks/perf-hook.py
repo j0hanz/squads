@@ -38,10 +38,11 @@ from pathlib import Path
 from typing import Any
 
 ERR_MAX = 160
-# ponytail: 8s < the 10s hooks.json entries so a hung rule is logged as a
-# fail-open timeout instead of vanishing when Claude Code kills the wrapper.
-# session-start (5s entry) dies unlogged on timeout — accepted, it is jq-free.
+# Child timeout sits below its hooks.json entry so a hung rule is logged as a
+# fail-open timeout instead of vanishing when Claude Code kills the wrapper:
+# 8s < the 10s pre/post/dispatch entries, 4s < the 5s session-start entry.
 CHILD_TIMEOUT = 8
+SESSION_START_TIMEOUT = 4
 GATES = ("governor-gate", "debug-gate", "dispatch-check", "plan-schema")
 
 
@@ -82,10 +83,13 @@ def run_rule(
     """Run squads-hook.sh <rule> with the payload on stdin, wall-clocked."""
     script = script or Path(__file__).with_name("squads-hook.sh")
     cmd = [find_bash(), str(script).replace("\\", "/"), rule]
+    timeout = (
+        SESSION_START_TIMEOUT if rule == "session-start" else CHILD_TIMEOUT
+    )
     t0 = time.perf_counter()
     try:
         proc = subprocess.run(
-            cmd, input=payload, capture_output=True, timeout=CHILD_TIMEOUT
+            cmd, input=payload, capture_output=True, timeout=timeout
         )
         out, err, code, timed_out = (
             proc.stdout,
@@ -379,7 +383,8 @@ def self_check() -> None:
             f' "{_state_expr}/squads-debug-gate-{sid}"'
         )
 
-    # (1) governor-gate: squads:debug with no flag → deny, flag must not arm
+    # (1) governor-gate: squads:debug with no governor flag → deny. pre-tool
+    # arms nothing now (arming is post-tool), so neither flag appears.
     sid = "schk-gov"
     _clean(sid)
     r = run_rule(
@@ -394,19 +399,23 @@ def self_check() -> None:
     )
     assert r["code"] == 2 and r["err"].startswith(b"squads governor-gate:"), r
     assert not _flag(f"squads-governor-{sid}"), (
-        "governor deny must not arm the flag"
+        "pre-tool must not arm governor"
+    )
+    assert not _flag(f"squads-debug-gate-{sid}"), (
+        "denied skill must not arm debug"
     )
     _clean(sid)
 
-    # (2) debug-gate: arm via squads:debug, then non-exempt Write denies,
-    # exempt *.md Write passes. Governor flag is armed by running
-    # squads:dispatch-agents first (bash creates the flag in its state_dir,
-    # which Python's /tmp does not share on Windows), so governor-gate then
-    # lets squads:debug through to arm the debug flag.
+    # (2) post-tool arms/lifts, pre-tool denies. dispatch-agents (post-tool) arms
+    # governor; squads:debug then clears governor at pre-tool WITHOUT arming debug
+    # (pre-tool no longer arms); post-tool squads:debug arms it; a non-exempt Write
+    # denies, an exempt *.md passes; post-tool squads:tdd lifts it. Flags live in
+    # the hook's bash state_dir, so every touch/lift is routed through the real
+    # dispatcher, not fabricated in Python.
     sid = "schk-dbg"
     _clean(sid)
     r = run_rule(
-        "pre-tool",
+        "post-tool",
         json.dumps(
             {
                 "tool_name": "Skill",
@@ -415,9 +424,20 @@ def self_check() -> None:
             }
         ).encode(),
     )
-    assert r["code"] == 0, r
+    assert r["code"] == 0 and _flag(f"squads-governor-{sid}"), r
     r = run_rule(
         "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:debug"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and not _flag(f"squads-debug-gate-{sid}"), r
+    r = run_rule(
+        "post-tool",
         json.dumps(
             {
                 "tool_name": "Skill",
@@ -449,6 +469,17 @@ def self_check() -> None:
         ).encode(),
     )
     assert r["code"] == 0, r
+    r = run_rule(
+        "post-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:tdd"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and not _flag(f"squads-debug-gate-{sid}"), r
     _clean(sid)
 
     # (3) plan-schema: Write to docs/plan/x.plan.md missing Origin → deny
@@ -486,6 +517,76 @@ def self_check() -> None:
     assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
     _clean(sid)
 
+    # (5) plan-schema: a full Canonical Task Block passes; dropping one field
+    # denies and names it — exercises the 7-field awk, not just the Origin
+    # short-circuit that test (3) covers.
+    full_plan = (
+        "Origin: plan\n\n"
+        "### TASK-001: Do the thing\n\n"
+        "Depends on: none\n"
+        "Files: src/x.go\n"
+        "Symbols: foo\n"
+        "Satisfies: REQ-001\n"
+        "Action: Do it.\n"
+        "Validate: `go test`\n"
+        "Expected result: passes\n"
+    )
+    sid = "schk-plan2"
+    _clean(sid)
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "docs/plan/x.plan.md",
+                    "content": full_plan,
+                },
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and r["err"] == b"", r
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "docs/plan/x.plan.md",
+                    "content": full_plan.replace("Symbols: foo\n", ""),
+                },
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 2 and b"Symbols" in r["err"], r
+    _clean(sid)
+
+    # (6) dispatch-check untrusted_context: a balanced block hides its {{...}}
+    # from the linter; a close-before-open block fails closed.
+    balanced = json.dumps(
+        {
+            "tool_name": "Agent",
+            "tool_input": {
+                "prompt": "analyze:\n<untrusted_context>\n"
+                "user: {{foo}}\n</untrusted_context>\ndone"
+            },
+        }
+    ).encode()
+    r = run_rule("dispatch-check", balanced)
+    assert r["code"] == 0 and r["err"] == b"", r
+    misordered = json.dumps(
+        {
+            "tool_name": "Agent",
+            "tool_input": {
+                "prompt": "</untrusted_context>\n{{x}}\n<untrusted_context>"
+            },
+        }
+    ).encode()
+    r = run_rule("dispatch-check", misordered)
+    assert r["code"] == 2 and b"untrusted_context" in r["err"], r
+
     print("self-check OK")
 
 
@@ -496,7 +597,20 @@ if __name__ == "__main__":
     elif argv == ["report"]:
         report()
     else:
-        code = 0
-        with suppress(Exception):  # hook path must never block the chain
-            code = main(argv[0] if argv else "")
+        rule = argv[0] if argv else ""
+        try:
+            code = main(rule)
+        except Exception:
+            # Fail-open by default so a wrapper bug never wedges a session.
+            # dispatch-check is the one fail-CLOSED guard (§5.1): a crash there
+            # must still block, matching the jq-missing / bad-payload denies in
+            # the dispatcher, or a placeholder could ship on a wrapper fault.
+            if rule == "dispatch-check":
+                sys.stderr.write(
+                    "squads dispatch-check: guard wrapper failed — dispatch "
+                    "blocked. Retry; if it persists, check python/bash/jq.\n"
+                )
+                code = 2
+            else:
+                code = 0
         sys.exit(code)

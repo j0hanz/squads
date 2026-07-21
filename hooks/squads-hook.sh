@@ -71,21 +71,23 @@ session_start() {
 # without jq (squads is dispatch-first; hygiene unverifiable = blocked, with hint).
 dispatch_check() {
   command -v jq >/dev/null 2>&1 || deny dispatch-check "jq not found — guard cannot run. Install jq (Windows: winget install jqlang.jq; macOS: brew install jq; Linux: apt/dnf install jq) and retry. Blocked."
-  local body placeholders open close
-  body=$(jq -r '[.tool_input.prompt // .tool_input.message // "", .tool_input.script // "", .tool_input.description // ""] | join("\n")' 2>/dev/null) || exit 0
-  # An unbalanced <untrusted_context> block would smuggle placeholders past the
-  # awk strip — deny before stripping so opens and closes must pair up.
-  open=$(grep -cE '^<untrusted_context>[[:space:]]*$' <<<"$body")
-  close=$(grep -cE '^</untrusted_context>[[:space:]]*$' <<<"$body")
-  [[ "$open" -eq "$close" ]] ||
-    deny dispatch-check "unbalanced untrusted_context tag — close the block or wrap braces as data"
+  local body placeholders
+  # prompt/message/script/description/args (args serialized — a struct can't
+  # form a {{ ), all joined and linted. Fail-closed on unparseable JSON too:
+  # dispatch-first means unverifiable hygiene is blocked, not shipped.
+  body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", (.tool_input.args // "" | tostring)] | join("\n")' 2>/dev/null) ||
+    deny dispatch-check "dispatch payload is not valid JSON — placeholder hygiene unverifiable. Blocked; retry."
   # <untrusted_context> blocks are data to analyze, never instructions — strip them
   # before linting so wrapped third-party content can legitimately contain {{...}}.
+  # Same pass fails closed on a misordered/unclosed block (close before open, or
+  # EOF still inside one): either could smuggle a placeholder past the strip.
   body=$(awk '
-    /^<untrusted_context>[[:space:]]*$/ { skip = 1; next }
-    /^<\/untrusted_context>[[:space:]]*$/ { skip = 0; next }
+    /^<untrusted_context>[[:space:]]*$/  { if (skip) { bad = 1; exit } skip = 1; next }
+    /^<\/untrusted_context>[[:space:]]*$/ { if (!skip) { bad = 1; exit } skip = 0; next }
     !skip
-  ' <<<"$body")
+    END { if (skip || bad) exit 3 }
+  ' <<<"$body") ||
+    deny dispatch-check "misordered or unclosed <untrusted_context> block — each must open before it closes and be closed; wrap braces as data inside a balanced block."
   placeholders=$(grep -oE '\{\{[^{}]*\}\}' <<<"$body" | sort -u | paste -sd, -)
   [[ -z "$placeholders" ]] || deny dispatch-check "dispatch body contains unresolved placeholder(s) $placeholders — replace every {{...}} with real values before dispatching (wrap third-party content in <untrusted_context> if the braces are data)."
   exit 0
@@ -94,20 +96,21 @@ dispatch_check() {
 # ---------- pre-tool ----------
 
 # governor gate: squads is dispatch-first — invoking a lifecycle skill is denied
-# until squads:dispatch-agents (Step 0 Governor) has run once this session.
-# Per-session flag file, reaped by session-start's 120-min sweep. Best-effort:
-# cannot catch a turn that follows a skill's flow without ever calling the Skill
-# tool. Runs BEFORE debug_gate so a denied squads:debug never arms the debug flag.
+# until squads:dispatch-agents (Step 0 Governor) has run once this session. The
+# flag is armed on the PostToolUse side (post_tool), so a rejected or errored
+# Skill call never arms it; this side is deny-only. Per-session flag file, reaped
+# by session-start's 120-min sweep. Best-effort: cannot catch a turn that follows
+# a skill's flow without ever calling the Skill tool. Only squads:-prefixed names
+# are matched — the installed plugin always invokes prefixed, so a bare `debug`
+# or `plan` is a foreign skill and must not trip this gate.
 governor_gate() { # governor_gate <tool> <skill> <sid>
   local tool="$1" skill="$2" sid="$3" flag
   [[ "$tool" == "Skill" ]] || return 0
   sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
   flag="$(state_dir)/squads-governor-${sid:-unknown}"
   case "$skill" in
-    squads:dispatch-agents | dispatch-agents) touch "$flag" ;;
-    squads:brainstorm | brainstorm | squads:plan | plan | squads:tdd | tdd | \
-      squads:debug | debug | squads:review | review | \
-      squads:forge-workflow | forge-workflow)
+    squads:brainstorm | squads:plan | squads:tdd | \
+      squads:debug | squads:review | squads:forge-workflow)
       [[ -f "$flag" ]] ||
         deny governor-gate "squads is dispatch-first — invoke squads:dispatch-agents first; its Step 0 Governor triages every request and routes to this skill if it fits. Run it, then re-invoke."
       ;;
@@ -115,32 +118,27 @@ governor_gate() { # governor_gate <tool> <skill> <sid>
   return 0
 }
 
-# debug HARD GATE: while that skill is active, non-test/non-md edits are
-# denied until the root cause is routed to tdd / plan / review (which lifts the flag).
-# dispatch-agents is NOT a lift — it bypasses reproduce-first. Per-session flag file,
-# 120-min expiry backstop.
-debug_gate() { # debug_gate <tool> <skill> <sid> <file_path>
-  local tool="$1" skill="$2" sid="$3" file_path="$4" flag
+# debug HARD GATE (pre-tool side): while squads:debug is active, non-test/non-md
+# edits are denied. Deny-only here — the flag is armed by squads:debug and lifted
+# by tdd / plan / review on the PostToolUse side (post_tool), so a rejected Skill
+# call never arms or lifts it. dispatch-agents is NOT a lift — it bypasses
+# reproduce-first. Per-session flag file, 120-min expiry backstop auto-lifts an
+# abandoned flag on the next edit attempt.
+debug_gate() { # debug_gate <tool> <sid> <file_path>
+  local tool="$1" sid="$2" file_path="$3" flag
+  case "$tool" in
+    Write | Edit | MultiEdit | NotebookEdit) ;;
+    *) return 0 ;;
+  esac
   sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
   flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
-  case "$tool" in
-    Skill)
-      case "$skill" in
-        squads:debug | debug) touch "$flag" ;;
-        squads:tdd | tdd | squads:plan | plan | squads:review | review) rm -f "$flag" ;;
-      esac
-      ;;
-    Write | Edit | MultiEdit | NotebookEdit)
-      [[ -f "$flag" ]] || return 0
-      if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
-        rm -f "$flag"
-        return 0
-      fi
-      is_exempt_path "$(basename "${file_path//\\//}")" ||
-        deny debug-gate "debug is active — its HARD GATE forbids code edits before the root cause is reproduced and routed to tdd (logic bug) or plan (design-level); review also lifts. If debugging was abandoned, remove $flag."
-      ;;
-  esac
-  return 0
+  [[ -f "$flag" ]] || return 0
+  if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
+    rm -f "$flag"
+    return 0
+  fi
+  is_exempt_path "$(basename "${file_path//\\//}")" ||
+    deny debug-gate "debug is active — its HARD GATE forbids code edits before the root cause is reproduced and routed to tdd (logic bug) or plan (design-level); review also lifts. If debugging was abandoned, remove $flag."
 }
 
 # Shared plan-schema validator: file content on stdin, first violation text on
@@ -184,16 +182,18 @@ pre_tool() {
   command -v jq >/dev/null 2>&1 || exit 0
   local input tool="" skill="" sid="" file_path="" content=""
   input=$(cat)
-  # Single jq for scalars; jq failure leaves locals empty → fail-open (no set -u abort).
-  local fields=()
-  mapfile -t fields < <(
+  # Single jq for scalars. `read` (bash 3.2+), NOT `mapfile` (bash 4.0+): the
+  # dispatcher must run under macOS /bin/bash 3.2, where mapfile is absent and
+  # would silently no-op every gate. jq failure → fewer lines → vars stay empty
+  # (declared above) → fail-open, no set -u abort.
+  { read -r tool; read -r skill; read -r sid; read -r file_path; } < <(
     jq -r '.tool_name // "", .tool_input.skill // "", .session_id // "",
           (.tool_input.file_path // .tool_input.notebook_path // "")' <<<"$input" 2>/dev/null | tr -d '\r'
   )
-  tool="${fields[0]:-}" skill="${fields[1]:-}" sid="${fields[2]:-}" file_path="${fields[3]:-}"
-  # governor_gate runs first; deny()→exit 2 structurally prevents debug_gate arming on a denied squads:debug.
+  # governor_gate runs first; a denied lifecycle skill exits 2 before debug_gate.
+  # Arming/lifting is post_tool's job, so neither gate mutates state here.
   governor_gate "$tool" "$skill" "$sid"
-  debug_gate "$tool" "$skill" "$sid" "$file_path"
+  debug_gate "$tool" "$sid" "$file_path"
   [[ "$tool" == "Write" ]] && {
     content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
     plan_schema "$file_path" "$content"
@@ -203,16 +203,32 @@ pre_tool() {
 
 # ---------- post-tool ----------
 
-# PostToolUse plan-schema feedback: on Write|Edit|MultiEdit|NotebookEdit that
-# names a docs/plan/*.plan.md path, re-read the completed file from disk and
-# emit the missing-field violation to stderr, exit 2. Silent exit 0 otherwise
-# (including missing jq or unreadable file). Feedback-only — never a deny.
+# PostToolUse. Two jobs, keyed off the tool that just COMPLETED (a PreToolUse
+# deny never reaches here, so a rejected Skill call cannot arm/lift a flag):
+#   Skill → arm the governor flag (dispatch-agents) or debug flag (squads:debug);
+#           lift the debug flag (tdd / plan / review). This is where session
+#           state is mutated — never at PreToolUse.
+#   Write|Edit|... on a docs/plan/*.plan.md → re-read the completed file and emit
+#           missing-field violations to stderr, exit 2. Feedback-only, never a
+#           deny. Silent exit 0 otherwise (missing jq, unreadable file, etc.).
 post_tool() {
   command -v jq >/dev/null 2>&1 || exit 0
   local input tool file_path content violations
   input=$(cat)
   tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null)
   case "$tool" in
+    Skill)
+      local skill sid
+      skill=$(jq -r '.tool_input.skill // ""' <<<"$input" 2>/dev/null)
+      sid=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null)
+      sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
+      case "$skill" in
+        squads:dispatch-agents) touch "$(state_dir)/squads-governor-${sid:-unknown}" ;;
+        squads:debug) touch "$(state_dir)/squads-debug-gate-${sid:-unknown}" ;;
+        squads:tdd | squads:plan | squads:review) rm -f "$(state_dir)/squads-debug-gate-${sid:-unknown}" ;;
+      esac
+      exit 0
+      ;;
     Write | Edit | MultiEdit | NotebookEdit) ;;
     *) exit 0 ;;
   esac

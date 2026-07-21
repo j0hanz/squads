@@ -54,7 +54,7 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 
 **Preflight** (once per session): assert the composed-mode preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight); abort with a clear message if not. **No fallback** — do not degrade to turn-by-turn Agent dispatches; the in-script truncation, quorum tally, and agent-count cap are unenforceable outside the runtime.
 
-Enumerate distinct root-cause hypotheses (from repro, stack trace, failing function's callers), then invoke forge-workflow's `debug-verify` recipe with `args={hypotheses[], repro_cmd, failing_output, rubric}`. The recipe is strictly [read-only class](../forge-workflow/SKILL.md#read-only-class) — runtime agents run `acceptEdits` and the read-only class compensates; `hooks/debug-gate.sh` still blocks main-thread edits regardless.
+Enumerate distinct root-cause hypotheses (from repro, stack trace, failing function's callers), then invoke forge-workflow's `debug-verify` recipe with `args={hypotheses[], repro_cmd, failing_output, rubric}`. The recipe is strictly [read-only class](../forge-workflow/SKILL.md#read-only-class) — runtime agents run `acceptEdits` and the read-only class compensates; the `squads-hook.sh` `debug-gate` rule still blocks main-thread edits regardless.
 
 Write the rubric confirmed root cause must satisfy _before_ invoking — single-thread included (Criteria before dispatch; criteria written after result only confirm guesses): reproduces symptom, all failing paths route through it, classification named.
 

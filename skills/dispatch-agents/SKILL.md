@@ -80,7 +80,7 @@ success_criteria: <rubric / stop condition, written before dispatch>
 
 ### Composed runs are read-only by default
 
-Composed runs are read-only class by default — hooks (`dispatch-check.sh`, `debug-gate.sh`) do not fire inside the native workflow runtime. Edit-class or fetch-class need explicit user approval, and are refused while the debug-gate flag is set. The Governor never lifts the debug-gate.
+Composed runs are read-only class by default — hooks (the `squads-hook.sh` `dispatch-check` / `debug-gate` rules) do not fire inside the native workflow runtime. Edit-class or fetch-class need explicit user approval, and are refused while the debug-gate flag is set. The Governor never lifts the debug-gate.
 
 ### Escalation seam
 

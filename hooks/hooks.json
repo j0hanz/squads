@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated — see docs/design/2026-07-20-squads-hooks-redesign-design.md.",
+  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.",
   "hooks": {
     "SessionStart": [
       {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # squads-plugin hook dispatcher. One file, one rule function per <rule> subcommand,
-# invoked as `squads-hook.sh <rule>` via exec-form hooks.json. Shared lib sourced at top.
+# invoked as `squads-hook.sh <rule>` via command-string hooks.json. Shared lib sourced at top.
 #
 # Rules (gate-lifts for debug-gate: routing to tdd / plan / review closes the
 # parallel-debugging HARD GATE; dispatch-agents is NOT a lift — it bypasses reproduce-first):

@@ -1,6 +1,3 @@
 # Dependencies
 node_modules
 package-lock.json
-
-# Recorded test harness inputs — ephemeral runtime data, not source
-.simulate

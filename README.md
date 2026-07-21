@@ -25,7 +25,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, exec-form `hooks/hooks.json`, 30s PreToolUse timeout). Note: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.
+> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json`, 30s PreToolUse timeout). Note: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.
 
 ## Usage
 
@@ -48,7 +48,7 @@ user request → dispatch-agents (Governor: pick workflow + fleet)
   │                                                  └→ dispatch-agents (multi-task) / tdd (single task)
   ├─ failure       → parallel-debugging → tdd (logic bug) / plan (design-level)
   ├─ bulk / audit  → dispatch-agents patterns (fan out, adversarial verify, loop until done)
-  ├─ approved plan → forge-workflow (forge/library branch: generates per-project `.claude/workflows/<name>.js` + `docs/workflows/CATALOG.md`, never shipped)
+  ├─ approved plan → dispatch-agents (execute task graph) · forge-workflow (recurring bulk: generates per-project `.claude/workflows/<name>.js` + `docs/workflows/CATALOG.md`, never shipped)
   └─ verified diff → review (request) → review (resolve) → commit / PR
 ```
 

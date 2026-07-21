@@ -6,12 +6,18 @@
 # parallel-debugging HARD GATE; dispatch-agents is NOT a lift — it bypasses reproduce-first):
 #   session-start   SessionStart                                  — inline router + wiring banner
 #   dispatch-check  PreToolUse Agent|SendMessage|Workflow         — dispatch hygiene
-#   debug-gate      PreToolUse Skill|Write|Edit|MultiEdit|NotebookEdit|Bash — debugging HARD GATE
-#   tdd-gate        PreToolUse Write|Edit|MultiEdit|NotebookEdit   — RED before GREEN (REQ-003)
+#   pre-tool        PreToolUse Skill|Write|Edit|MultiEdit|NotebookEdit|Bash — consolidated: runs
+#                   debug-gate then tdd-gate (Write|Edit|MultiEdit|NotebookEdit) then plan-schema
+#                   (Write) in strictest-first order, one stdin read + one jq per arm
+#   debug-gate      (standalone rule name, still wired) — debugging HARD GATE
+#   tdd-gate        (standalone rule name, still wired) — RED before GREEN (REQ-003)
 #   tdd-arm         PostToolUseFailure Bash                        — arm RED flag on a failed Bash (REQ-004; design correction: PostToolUse fires only on exit 0, so the non-zero case is PostToolUseFailure)
 #   return-shape    SubagentStop                                   — Handoff-Contract return shape (REQ-005)
-#   plan-schema     PreToolUse Write docs/plan/*.plan.md           — Canonical Task Block (REQ-006)
+#   plan-schema     (standalone rule name, still wired) — Canonical Task Block (REQ-006)
 #   session-end     SessionEnd                                     — clean this session's state files
+#
+# Gate ORDER inside pre-tool (debug → tdd → plan-schema) is observable when multiple
+# gates would deny: debug-gate is a hard gate and runs first (strictest-first).
 #
 # `set -uo pipefail` WITHOUT `-e` is intentional: grep -c / find / jq parse paths return
 # non-zero legitimately and must not abort the hook. Do not add `-e`.
@@ -204,19 +210,28 @@ dispatch_check() {
 # legitimate during debugging). The gate is per-session and expires after 120 minutes.
 debug_gate() {
   jq_fail_closed debug-gate
-  local input tool sid flag skill file_path base cmd target
-  input=$(cat)
-  # Fail-closed on malformed JSON AND on empty tool_name (REQ-002): without a tool_name
-  # the gate cannot route, so it blocks rather than let edits through unfiltered.
-  tool=$(jq -r '.tool_name // empty' <<<"$input" 2>/dev/null) || \
+  local input tool sid flag skill file_path base cmd target _fields
+  if [[ $# -gt 0 ]]; then input="$1"; else input=$(cat); fi
+  # Single jq read of every field this gate inspects across all branches (tool_name,
+  # session_id, skill, file_path|notebook_path, command), @base64 one per line so a
+  # multi-line command survives intact. Fail-closed on parse error (REQ-002): a
+  # malformed input or empty tool_name blocks rather than lets edits through unfiltered.
+  _fields=(); while IFS= read -r line; do _fields+=("$line"); done < <(jq -r \
+    '[.tool_name // "", .session_id // "unknown", .tool_input.skill // "", (.tool_input.file_path // .tool_input.notebook_path // ""), .tool_input.command // ""] | .[] | @base64' \
+    <<<"$input" 2>/dev/null)
+  (( ${#_fields[@]} == 5 )) || \
     deny debug-gate "input is not valid JSON — gate cannot inspect it. Blocked."
+  tool=$(b64d "${_fields[0]}")
+  sid=$(b64d "${_fields[1]}")
+  skill=$(b64d "${_fields[2]}")
+  file_path=$(b64d "${_fields[3]}")
+  cmd=$(b64d "${_fields[4]}")
   [[ -n "$tool" ]] || deny debug-gate "empty tool_name — gate cannot inspect the tool. Blocked."
-  sid=$(jq -r '.session_id // "unknown"' <<<"$input" | tr -cd 'a-zA-Z0-9-')
+  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid")
   flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
 
   case "$tool" in
     Skill)
-      skill=$(jq -r '.tool_input.skill // empty' <<<"$input")
       case "$skill" in
         squads:parallel-debugging|parallel-debugging)
           touch "$flag"
@@ -230,9 +245,8 @@ debug_gate() {
       ;;
 
     Write|Edit|MultiEdit|NotebookEdit)
-      [[ -f "$flag" ]] || exit 0
-      if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then rm -f "$flag"; exit 0; fi
-      file_path=$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")
+      [[ -f "$flag" ]] || return 0
+      if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then rm -f "$flag"; return 0; fi
       base=$(basename "${file_path//\\//}")
       is_exempt_path "$base" || \
         deny debug-gate "parallel-debugging is active — its HARD GATE forbids code edits before the root cause is reproduced, adversarially verified, and routed to tdd (logic bug) or plan (design-level). Invoke the routing skill first; if debugging was abandoned, remove $flag."
@@ -245,9 +259,8 @@ debug_gate() {
       # lifts the flag). Catches > / >> redirects, tee targets (flags skipped), and sed -i
       # in-place edits. [[...]]/((...)) comparison contexts are stripped first so their
       # '>' operator isn't misread as a redirect. Route-to-sibling lifts the flag.
-      [[ -f "$flag" ]] || exit 0
-      if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then rm -f "$flag"; exit 0; fi
-      cmd=$(jq -r '.tool_input.command // empty' <<<"$input")
+      [[ -f "$flag" ]] || return 0
+      if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then rm -f "$flag"; return 0; fi
       local uc last
       while IFS= read -r target; do
         [[ -z "$target" || "$target" == -* ]] && continue
@@ -275,7 +288,33 @@ debug_gate() {
       ;;
   esac
 
-  exit 0
+  return 0
+}
+
+# ---------- pre-tool ----------
+
+# Consolidated PreToolUse entry for the Skill/Write/Edit/MultiEdit/NotebookEdit/Bash tool
+# set. Reads stdin ONCE, then runs the three gates that previously had overlapping
+# matchers, in strictest-first order so the hardest deny wins:
+#   1. debug_gate   (Skill|Write|Edit|MultiEdit|NotebookEdit|Bash) — debugging HARD GATE
+#   2. tdd_gate     (Write|Edit|MultiEdit|NotebookEdit)            — RED before GREEN
+#   3. plan_schema  (Write)                                        — Canonical Task Block
+# Each gate `return`s on allow (so the next can run) and `exit 2`s via deny() on a
+# block (which ends the process). Tool-name scoping that narrower matchers provided
+# lives here. dispatch-check stays its own entry (disjoint tool set, already single-jq).
+pre_tool() {
+  jq_fail_closed pre-tool
+  local input tool
+  input=$(cat)
+  debug_gate "$input"
+  tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null)
+  case "$tool" in
+    Write|Edit|MultiEdit|NotebookEdit) tdd_gate "$input" ;;
+  esac
+  case "$tool" in
+    Write) plan_schema "$input" ;;
+  esac
+  return 0
 }
 
 # ---------- session-start ----------
@@ -366,23 +405,30 @@ tdd_arm() {
 # both fire on a Write/Edit and both must allow.
 tdd_gate() {
   jq_fail_closed tdd-gate
-  local input tool sid flag file_path base
-  input=$(cat)
-  tool=$(jq -r '.tool_name // empty' <<<"$input" 2>/dev/null) || \
+  local input tool sid flag file_path base _fields
+  if [[ $# -gt 0 ]]; then input="$1"; else input=$(cat); fi
+  # Single jq read of tool_name, session_id, and file_path|notebook_path (@base64 lines),
+  # fail-closed on parse error — same message as the pre-refactor multi-jq path.
+  _fields=(); while IFS= read -r line; do _fields+=("$line"); done < <(jq -r \
+    '[.tool_name // "", .session_id // "unknown", (.tool_input.file_path // .tool_input.notebook_path // "")] | .[] | @base64' \
+    <<<"$input" 2>/dev/null)
+  (( ${#_fields[@]} == 3 )) || \
     deny tdd-gate "input is not valid JSON — gate cannot inspect it. Blocked."
+  tool=$(b64d "${_fields[0]}")
+  sid=$(b64d "${_fields[1]}")
+  file_path=$(b64d "${_fields[2]}")
   [[ -n "$tool" ]] || deny tdd-gate "empty tool_name — gate cannot inspect the tool. Blocked."
-  sid=$(jq -r '.session_id // "unknown"' <<<"$input" | tr -cd 'a-zA-Z0-9-')
+  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid")
   flag="$(state_dir)/squads-tdd-red-${sid:-unknown}"
   if [[ -f "$flag" ]]; then
     if [[ -z "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
       echo "squads tdd-gate: RED observed (tdd-arm) — impl edit permitted this session; 120 min expiry backstop."
-      exit 0
+      return 0
     fi
     rm -f "$flag"   # expired flag → treat as not armed
   fi
-  file_path=$(jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' <<<"$input")
   base=$(basename "${file_path//\\//}")
-  is_exempt_path "$base" && exit 0   # test/spec/md edits always allowed (write the test first)
+  is_exempt_path "$base" && return 0   # test/spec/md edits always allowed (write the test first)
   deny tdd-gate "no impl edit before a failing test is observed (RED before GREEN) — run the covering test and let it fail first (squads:tdd), or invoke squads:tdd. flag=$flag"
 }
 
@@ -402,11 +448,22 @@ tdd_gate() {
 # marker (fallback: hash of last_assistant_message). 120min expiry backstop.
 return_shape() {
   jq_fail_closed return-shape
-  local input sid agent_id msg hash_cmd state_file missing malformed
+  local input sid agent_id msg hash_cmd state_file missing malformed _fields
   input=$(cat)
-  sid=$(jq -r '.session_id // "unknown"' <<<"$input" | tr -cd 'a-zA-Z0-9-')
-  agent_id=$(jq -r '.agent_id // empty' <<<"$input" 2>/dev/null | tr -cd 'a-zA-Z0-9-')
-  msg=$(jq -r '.last_assistant_message // ""' <<<"$input" 2>/dev/null)
+  # Single jq read of session_id, agent_id, last_assistant_message, stop_hook_active
+  # (@base64 lines so a multi-line message survives intact). This arm DEGRADES on parse
+  # error (no fail-closed deny): a malformed input yields empty fields, the shape check
+  # then denies with the Handoff-Contract message — same behavior as the pre-refactor path.
+  _fields=(); while IFS= read -r line; do _fields+=("$line"); done < <(jq -r \
+    '[.session_id // "unknown", .agent_id // "", .last_assistant_message // "", (.stop_hook_active // false)] | map(tostring) | .[] | @base64' \
+    <<<"$input" 2>/dev/null)
+  sid=$(b64d "${_fields[0]:-}")
+  agent_id=$(b64d "${_fields[1]:-}")
+  msg=$(b64d "${_fields[2]:-}")
+  local stop_hook_active
+  stop_hook_active=$(b64d "${_fields[3]:-}")
+  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid")
+  agent_id=$(tr -cd 'a-zA-Z0-9-' <<<"$agent_id")
   if [[ -z "$agent_id" ]]; then
     hash_cmd=$(command -v shasum || command -v sha256sum) || \
       { echo "squads return-shape: no agent_id and no hash tool — cannot key per-subagent; allowing stop (best-effort)." >&2; exit 0; }
@@ -434,7 +491,7 @@ return_shape() {
   # Loop-prevention backstop: honor CC's own stop_hook_active signal, and our own
   # per-subagent marker. Either set → allow stop + abort diagnostic (cooperate with CC's
   # 8-consecutive-block override, and survive state-file loss / TMPDIR change).
-  if [[ "$(jq -r '.stop_hook_active // false' <<<"$input" 2>/dev/null)" == "true" ]] || [[ -f "$state_file" ]]; then
+  if [[ "$stop_hook_active" == "true" ]] || [[ -f "$state_file" ]]; then
     echo "squads return-shape: subagent did not return Handoff-Contract shape after retry — abort, route to parallel-debugging. ($malformed)"
     exit 0
   fi
@@ -453,16 +510,23 @@ return_shape() {
 # not papered over (PostToolUse re-read diagnostic deferred, YAGNI).
 plan_schema() {
   jq_fail_closed plan-schema
-  local input file_path content status depth missing
-  input=$(cat)
-  file_path=$(jq -r '.tool_input.file_path // empty' <<<"$input" 2>/dev/null) || \
+  local input file_path content status depth missing _fields
+  if [[ $# -gt 0 ]]; then input="$1"; else input=$(cat); fi
+  # Single jq read of file_path + content (@base64 lines so a multi-line plan body
+  # survives intact). Fail-closed on parse error with the same message as the
+  # pre-refactor multi-jq path.
+  _fields=(); while IFS= read -r line; do _fields+=("$line"); done < <(jq -r \
+    '[.tool_input.file_path // "", .tool_input.content // ""] | .[] | @base64' \
+    <<<"$input" 2>/dev/null)
+  (( ${#_fields[@]} == 2 )) || \
     deny plan-schema "input is not valid JSON — guard cannot inspect it. Blocked."
+  file_path=$(b64d "${_fields[0]}")
+  content=$(b64d "${_fields[1]}")
   file_path="${file_path//\\//}"
   case "$file_path" in
     */docs/plan/*.plan.md|docs/plan/*.plan.md) ;;
-    *) exit 0 ;;
+    *) return 0 ;;
   esac
-  content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
 
   # APPROVED + sketch is a contradiction (validate mode rejects sketch plans).
   if printf '%s' "$content" | grep -qE '^Status:[[:space:]]*APPROVED' && \
@@ -486,7 +550,7 @@ plan_schema() {
   if [[ -n "$missing" ]]; then
     deny plan-schema "plan has TASK block(s) missing Canonical Task Block field(s) — $(printf '%s' "$missing" | tr '\n' '; '): each ### TASK-NNN: block needs all 7 (Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result)."
   fi
-  exit 0
+  return 0
 }
 
 # ---------- dispatch ----------
@@ -495,6 +559,7 @@ case "${1:-}" in
   session-start)   session_start ;;
   session-end)     session_end ;;
   dispatch-check)  dispatch_check ;;
+  pre-tool)        pre_tool ;;
   debug-gate)      debug_gate ;;
   tdd-gate)        tdd_gate ;;
   tdd-arm)         tdd_arm ;;

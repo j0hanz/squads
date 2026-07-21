@@ -50,7 +50,7 @@ Each ideator produces a lightweight proposal: short approach summary + numbered 
 
 ### Step 3: Synthesis
 
-`sketch`: skip — Step 2 output goes to Step 4. `contract`: main thread merges the 2 proposals, states what kept/discarded. `blueprint`: 1 Synthesizer agent (write/edit denied, `model: sonnet` — a merge needs no premium model) merges all three, same rationale requirement. Write the merged result in Canonical Task Block Schema.
+`sketch`: skip — Step 2 output goes to Step 4. `contract`: main thread merges the 2 proposals, states what kept/discarded. `blueprint`: 1 Synthesizer agent (write/edit denied, `model: 'haiku'` — per the flat model policy in [dispatch-agents](../dispatch-agents/SKILL.md#model--fan-out-policy); a merge needs no premium model) merges all three, same rationale requirement. Write the merged result in Canonical Task Block Schema.
 
 ### Step 4: Write
 
@@ -97,7 +97,7 @@ Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that
 - **`contract`** — 1 critic, all three lenses in a single pass, lighter check focused on scope boundaries and dependency cycles. Lens rubrics below still apply; one agent holds all three.
 - **`blueprint`** — 3 critics dispatched in ONE message (parallel Agent calls, `run_in_background: false`), one per lens, blind to each other.
 
-Critics run `model: sonnet` — rubric checks need no premium model. First validation round only: critics sweep freely per their lens. **Re-validation round (after a REVISE)**: each critic receives the prior round's findings for its lens and judges ONLY whether each is resolved — no fresh sweep. New findings it volunteers are recorded as plan-header comments and never enter the verdict unless High. (Fresh full-sweep critics each round find new Meds forever — the loop can't converge.)
+Critics run `model: 'haiku'` — per the flat model policy in [dispatch-agents](../dispatch-agents/SKILL.md#model--fan-out-policy); rubric checks need no premium model. First validation round only: critics sweep freely per their lens. **Re-validation round (after a REVISE)**: each critic receives the prior round's findings for its lens and judges ONLY whether each is resolved — no fresh sweep. New findings it volunteers are recorded as plan-header comments and never enter the verdict unless High. (Fresh full-sweep critics each round find new Meds forever — the loop can't converge.)
 
 Lens rubrics (each critic returns findings per its lens):
 

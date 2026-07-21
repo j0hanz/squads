@@ -289,6 +289,10 @@ debug_gate() {
 # string, no skill file read) and emit an honest wiring banner enumerating ALL hook
 # events present in hooks.json.
 session_start() {
+  # Reap state files from crashed sessions: any squads-* state older than the
+  # 120-min guard expiry belongs to no live session. -maxdepth 1: state files
+  # are created flat in state_dir; never recurse into other tmp content.
+  find "$(state_dir)" -maxdepth 1 -name 'squads-*' -mmin +120 -exec rm -f {} + 2>/dev/null || true
   if ! command -v jq >/dev/null 2>&1; then
     echo 'squads: jq not found — dispatch-check, debug-gate, tdd-gate, plan-schema and return-shape will DENY dispatch/edits this session (fail-closed). Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.' >&2
   else
@@ -315,8 +319,9 @@ session_start() {
 # ---------- session-end ----------
 
 # SessionEnd hook: delete this session's guard state files (debug-gate flag, tdd-red flag,
-# reviewer-dispatch counts, return-shape counters). The 120-minute expiry inside each
-# guard remains the backstop for crashed sessions where this hook never fires.
+# reviewer-dispatch counts, return-shape counters). The session-start reaper sweeps crashed
+# sessions' files past the same 120-min horizon (the per-guard expiry only fires when a
+# dead sid's own file is re-examined, which never happens — session-start is the real backstop).
 session_end() {
   command -v jq >/dev/null 2>&1 || exit 0   # no jq → guards never wrote state
   local input session_id reason tmp

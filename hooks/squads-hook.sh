@@ -168,35 +168,30 @@ dispatch_check() {
   sid=$(b64d "${_fields[4]}")
 
   reviewer_done=0
-  if [[ -z "$prompt" ]]; then
-    # Workflow dispatch: tool_input carries .script and/or .scriptPath (and optionally
-    # .description), not .prompt/.message. Inspect EACH body independently so a clean decoy
-    # cannot mask a dirty one, and so a <untrusted_context> marker in one body cannot span
-    # into another. .scriptPath takes precedence at runtime, so a non-readable one is denied.
-    [[ -n "$script" ]] && { body_kind=inline; _content_checks "$script"; \
-      [[ "$script" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$script" "$sid" "$tool_name" "$body_kind"; reviewer_done=1; }; }
-    if [[ -n "$scriptPath" ]]; then
-      scriptPath="${scriptPath/\$\{CLAUDE_PLUGIN_ROOT\}/${CLAUDE_PLUGIN_ROOT:-}}"
-      [[ -f "$scriptPath" && ! -L "$scriptPath" ]] || \
-        deny dispatch-check "Workflow dispatch carries a .scriptPath ($scriptPath) that is not a regular readable file — guard cannot inspect the executed body. Resolve the path or drop the dispatch."
-      if file_body=$(cat "$scriptPath" 2>/dev/null); then
-        body_kind=file; _content_checks "$file_body"
-        [[ "$file_body" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$file_body" "$sid" "$tool_name" "$body_kind"; reviewer_done=1; }
-      else
-        body_kind=file
-        deny dispatch-check "Workflow dispatch carries a .scriptPath ($scriptPath) that cannot be read — guard cannot inspect the executed body (.scriptPath takes precedence at runtime). Resolve the path or drop the dispatch."
-      fi
-    fi
-    [[ -n "$description" ]] && { _content_checks "$description"; \
-      [[ "$description" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$description" "$sid" "$tool_name" "description"; reviewer_done=1; }; }
-    exit 0
+  # Inspect EVERY present body independently so a clean decoy in one field cannot mask a
+  # dirty one, and a <untrusted_context> marker in one body cannot span into another.
+  # .scriptPath takes precedence at runtime, so a non-readable one is denied.
+  if [[ -n "$prompt" ]]; then
+    body_kind=prompt
+    _content_checks "$prompt"
+    [[ "$prompt" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$prompt" "$sid" "$tool_name" "$body_kind"; reviewer_done=1; }
   fi
-
-  # Task/Agent/SendMessage dispatch: content checks on the single prompt body, then the
-  # per-dispatch reviewer cap (keys off the dispatch event, runs once here).
-  body_kind=prompt
-  _content_checks "$prompt"
-  [[ "$prompt" == *'squads:reviewer-dispatch'* ]] && _reviewer_cap "$prompt" "$sid" "$tool_name" "$body_kind"
+  [[ -n "$script" ]] && { body_kind=inline; _content_checks "$script"; \
+    [[ "$script" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$script" "$sid" "$tool_name" "$body_kind"; reviewer_done=1; }; }
+  if [[ -n "$scriptPath" ]]; then
+    scriptPath="${scriptPath/\$\{CLAUDE_PLUGIN_ROOT\}/${CLAUDE_PLUGIN_ROOT:-}}"
+    [[ -f "$scriptPath" && ! -L "$scriptPath" ]] || \
+      deny dispatch-check "Workflow dispatch carries a .scriptPath ($scriptPath) that is not a regular readable file — guard cannot inspect the executed body. Resolve the path or drop the dispatch."
+    if file_body=$(cat "$scriptPath" 2>/dev/null); then
+      body_kind=file; _content_checks "$file_body"
+      [[ "$file_body" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$file_body" "$sid" "$tool_name" "$body_kind"; reviewer_done=1; }
+    else
+      body_kind=file
+      deny dispatch-check "Workflow dispatch carries a .scriptPath ($scriptPath) that cannot be read — guard cannot inspect the executed body (.scriptPath takes precedence at runtime). Resolve the path or drop the dispatch."
+    fi
+  fi
+  [[ -n "$description" ]] && { _content_checks "$description"; \
+    [[ "$description" == *'squads:reviewer-dispatch'* ]] && (( ! reviewer_done )) && { _reviewer_cap "$description" "$sid" "$tool_name" "description"; reviewer_done=1; }; }
   exit 0
 }
 

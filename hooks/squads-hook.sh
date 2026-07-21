@@ -7,9 +7,10 @@
 #   dispatch-check  PreToolUse Agent|SendMessage|Workflow — deny unresolved {{...}}
 #                   placeholders in dispatch bodies (the Governor's hook-fire probe
 #                   expects exactly this deny; a clean dispatch is silent by design)
-#   pre-tool        PreToolUse Skill|Write|Edit|MultiEdit|NotebookEdit — debug-gate
-#                   (debug HARD GATE) then plan-schema (Write to a
-#                   docs/plan/*.plan.md)
+#   pre-tool        PreToolUse Skill|Write|Edit|MultiEdit|NotebookEdit — governor-gate
+#                   (dispatch-first: lifecycle skills denied until dispatch-agents
+#                   ran this session), then debug-gate (debug HARD GATE), then
+#                   plan-schema (Write to a docs/plan/*.plan.md)
 #   post-tool       PostToolUse Write|Edit|MultiEdit|NotebookEdit — plan-schema
 #                   feedback-only on docs/plan/*.plan.md (exit 2 + stderr on
 #                   violation, silent exit 0 otherwise)
@@ -85,6 +86,30 @@ dispatch_check() {
 
 # ---------- pre-tool ----------
 
+# governor gate: squads is dispatch-first — invoking a lifecycle skill is denied
+# until squads:dispatch-agents (Step 0 Governor) has run once this session.
+# Per-session flag file, reaped by session-start's 120-min sweep. Best-effort:
+# cannot catch a turn that follows a skill's flow without ever calling the Skill
+# tool. Runs BEFORE debug_gate so a denied squads:debug never arms the debug flag.
+governor_gate() { # governor_gate <hook-input-json>
+  local input="$1" tool skill sid flag
+  tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null) || return 0
+  [[ "$tool" == "Skill" ]] || return 0
+  skill=$(jq -r '.tool_input.skill // ""' <<<"$input" 2>/dev/null)
+  sid=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null | tr -cd 'a-zA-Z0-9-')
+  flag="$(state_dir)/squads-governor-${sid:-unknown}"
+  case "$skill" in
+    squads:dispatch-agents | dispatch-agents) touch "$flag" ;;
+    squads:brainstorm | brainstorm | squads:plan | plan | squads:tdd | tdd | \
+      squads:debug | debug | squads:review | review | \
+      squads:forge-workflow | forge-workflow)
+      [[ -f "$flag" ]] ||
+        deny governor-gate "squads is dispatch-first — invoke squads:dispatch-agents first; its Step 0 Governor triages every request and routes to this skill if it fits. Run it, then re-invoke."
+      ;;
+  esac
+  return 0
+}
+
 # debug HARD GATE: while that skill is active, non-test/non-md edits are
 # denied until the root cause is routed to tdd / plan / review (which lifts the flag).
 # dispatch-agents is NOT a lift — it bypasses reproduce-first. Per-session flag file,
@@ -155,12 +180,14 @@ plan_schema() { # plan_schema <hook-input-json>
   return 0
 }
 
-# Consolidated PreToolUse entry: one stdin read, debug-gate first (hard gate), then
-# plan-schema on Write. No jq → the flag was never set either; nothing to enforce.
+# Consolidated PreToolUse entry: one stdin read, governor-gate first (dispatch-
+# first), then debug-gate (hard gate), then plan-schema on Write. No jq → the
+# flags were never set either; nothing to enforce.
 pre_tool() {
   command -v jq >/dev/null 2>&1 || exit 0
   local input tool
   input=$(cat)
+  governor_gate "$input"
   debug_gate "$input"
   tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null)
   [[ "$tool" == "Write" ]] && plan_schema "$input"

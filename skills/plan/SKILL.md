@@ -151,7 +151,7 @@ Re-validation round: unresolved prior High, or any NEW High → REVISE (2nd REVI
 
 ### Step 10: Finalize
 
-On APPROVED: flip `Status: DRAFT` → `Status: APPROVED` in the plan header. Hand off file paths to the execution skill — `dispatch-agents` for multi-task, `tdd` for a single focused task.
+On APPROVED: flip `Status: DRAFT` → `Status: APPROVED` in the plan header, then commit the pair (plus the source design brief, if any): `git add <paths> && git commit -m "docs(plan): <name> approved"` — cleanup commits delete these docs after the work ships, and only a tracked doc survives that deletion in history. Never hand off an untracked plan. Then hand off file paths to the execution skill — `dispatch-agents` for multi-task, `tdd` for a single focused task.
 
 ## Canonical Task Block Schema
 

@@ -8,7 +8,7 @@ argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 
 ## Step 0: Governor — invoked first, before any other skill
 
-Every task starts here. Governor checks preflight, picks mode via the Threshold Table, then routes: inline (fixed routing table) for small/no-runtime work, or composed (Composition Spec for forge-workflow) for big/fan-out work. No build, no plan, no fix before Governor says go.
+Every task starts here. Governor checks preflight, picks mode via the Threshold Table, then routes: inline (fixed routing table) for small/no-runtime work, or composed (Composition Spec for forge-workflow) for big/fan-out work. No build, no plan, no fix before Governor says go. The hook enforces this where it can: `squads-hook.sh` `governor-gate` denies any other squads skill invocation until dispatch-agents has been invoked once this session (best-effort — it cannot catch a turn that never calls the Skill tool).
 
 ### Preflight (first gate)
 
@@ -139,7 +139,7 @@ Pattern shapes, quorum, loop ceilings live in [forge-workflow](../forge-workflow
 
 ## Executing an approved plan
 
-When [plan](../plan/SKILL.md) (validate mode) hands off an APPROVED `docs/plan/<name>.plan.md`, its [Canonical Task Block Schema](../plan/SKILL.md#canonical-task-block-schema) fields drive dispatch — never improvise order:
+When [plan](../plan/SKILL.md) (validate mode) hands off an APPROVED `docs/plan/<name>.plan.md`, first confirm the plan/specs pair is git-tracked (`git ls-files --error-unmatch <plan-path>`); untracked → commit it before any worker dispatch — the executed plan must stay recoverable from history after cleanup commits delete it. Then its [Canonical Task Block Schema](../plan/SKILL.md#canonical-task-block-schema) fields drive dispatch — never improvise order:
 
 - **`Depends on:` sets order.** Dispatch a task only after its dependencies complete and validate. Tasks with no path between them may run parallel.
 - **`Files:` decides parallel vs. serial.** Overlapping lists → serial (or isolated worktrees). Disjoint → parallel safe.

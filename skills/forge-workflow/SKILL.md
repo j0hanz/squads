@@ -73,7 +73,7 @@ Each recipe maps an archetype to composition, default agent scale, `args` signat
 
 ### Read-only class
 
-A recipe is **read-only class** when no stage's `agent()` prompt permits file writes/edits and no stage fetches external content. `debug-verify` is read-only by definition: runtime agents run `acceptEdits` and hooks do not fire inside the runtime, so a drifted generation letting agents edit mid-debug would bypass debug-gate. Compensation: the Script Audit Checklist's no-write clause verifies every stage prompt denies write/edit tools before save, and `squads-hook.sh` `debug-gate` still blocks main-thread edits regardless. Read-only recipes are safe to smoke-slice and re-run — bounded cost, no state mutation.
+A recipe is **read-only class** when no stage's `agent()` prompt permits file writes/edits and no stage fetches external content. `debug-verify` is read-only by definition: runtime agents run `acceptEdits` and hooks do not fire inside the runtime, so a drifted generation letting agents edit mid-debug would bypass debug-gate. Compensation: the Script Audit Checklist's no-write clause verifies every stage prompt denies write/edit tools before save, and the `squads-hook.sh` `pre-tool` rule (whose `debug_gate` function implements the debug HARD GATE) still blocks main-thread edits regardless. Read-only recipes are safe to smoke-slice and re-run — bounded cost, no state mutation.
 
 ## Procedure
 

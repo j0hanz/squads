@@ -29,10 +29,10 @@ Single-thread only when the stack trace's top frame IS the root-cause line (wher
 
 ## Invariants — apply to every dispatch
 
-All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply exactly. Debug adds:
+All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply exactly (bare-claim to skeptics, judge ≠ generator — both defined there). Debug adds:
 
 - **No fake investigators or skeptics.** Main thread never authors investigator findings nor grades hypotheses it generated or read — investigation is hypothesis, not finding.
-- **Bare-claim to skeptics.** A hypothesis reaches skeptics as a one-line claim — `root cause is <X> at <file:line>, classified as <logic|design-level>` — no reasoning, no proof walk, no caller-graph findings. Skeptics re-derive proof from repro and exact output alone; smuggling investigator reasoning into the claim breaks judge ≠ generator while passing every literal rule.
+- **Bare-claim format (debug-specific shape of the canonical bare-claim rule):** a hypothesis reaches skeptics as a one-line claim — `root cause is <X> at <file:line>, classified as <logic|design-level>` — no reasoning, no proof walk, no caller-graph findings. Skeptics re-derive proof from repro and exact output alone.
 
 ## Step 0: Triage
 
@@ -54,7 +54,7 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 
 **Preflight** (once per session): assert composed-mode preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight); stop with clear message on fail. **No fallback** — never degrade to turn-by-turn Agent dispatch; in-script truncation, quorum tally, and agent-count cap are unenforceable outside the runtime.
 
-List distinct root-cause hypotheses (from repro, stack trace, failing function's callers). Write the rubric a confirmed root cause must meet _before_ invoking — single-thread included (criteria before dispatch): reproduces the symptom, all failing paths go through it, classification named. Then invoke forge-workflow's [`debug-verify` recipe](../forge-workflow/SKILL.md#recipe-catalog) with `args={hypotheses[], repro_cmd, failing_output, rubric}`. The script enforces the guardrails in code — blind read-only investigators, bare-claim truncation, distinct-angle skeptics, canonical quorum, `(file:line, classification)` dedupe, no-survivor/ceiling stop — see the catalog entry; it is strictly [read-only class](../forge-workflow/SKILL.md#read-only-class), and `squads-hook.sh` `debug-gate` blocks main-thread edits regardless.
+List distinct root-cause hypotheses (from repro, stack trace, failing function's callers). Write the rubric a confirmed root cause must meet _before_ invoking — single-thread included (criteria before dispatch): reproduces the symptom, all failing paths go through it, classification named. Then invoke forge-workflow's [`debug-verify` recipe](../forge-workflow/SKILL.md#recipe-catalog) with `args={hypotheses[], repro_cmd, failing_output, rubric}`. The script enforces the guardrails in code — blind read-only investigators, bare-claim truncation, distinct-angle skeptics, canonical quorum, `(file:line, classification)` dedupe, no-survivor/ceiling stop — see the catalog entry; it is strictly [read-only class](../forge-workflow/SKILL.md#read-only-class), and the `squads-hook.sh` `pre-tool` debug-gate rule blocks main-thread edits regardless.
 
 **Done when:** `debug-verify` returns a Handoff Contract with round log, survivors (each carrying refute-responses), and refutation trail; or stop condition hit and user escalated.
 

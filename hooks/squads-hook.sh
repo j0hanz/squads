@@ -10,6 +10,9 @@
 #   pre-tool        PreToolUse Skill|Write|Edit|MultiEdit|NotebookEdit — debug-gate
 #                   (debug HARD GATE) then plan-schema (Write to a
 #                   docs/plan/*.plan.md)
+#   post-tool       PostToolUse Write|Edit|MultiEdit|NotebookEdit — plan-schema
+#                   feedback-only on docs/plan/*.plan.md (exit 2 + stderr on
+#                   violation, silent exit 0 otherwise)
 #
 # `set -uo pipefail` WITHOUT `-e` is intentional: grep/find return non-zero
 # legitimately and must not abort the hook. Do not add `-e`.
@@ -58,12 +61,16 @@ session_start() {
 
 # Deny a dispatch whose body carries an unresolved {{...}} placeholder. Fail-closed
 # without jq (squads is dispatch-first; hygiene unverifiable = blocked, with hint).
-# ponytail: an unclosed <untrusted_context> open tag strips the rest of the body from
-# linting — add a balance check if that ever bites.
 dispatch_check() {
   command -v jq >/dev/null 2>&1 || deny dispatch-check "jq not found — guard cannot run. Install jq (Windows: winget install jqlang.jq; macOS: brew install jq; Linux: apt/dnf install jq) and retry. Blocked."
-  local body placeholders
+  local body placeholders open close
   body=$(jq -r '[.tool_input.prompt // .tool_input.message // "", .tool_input.script // "", .tool_input.description // ""] | join("\n")' 2>/dev/null) || exit 0
+  # An unbalanced <untrusted_context> block would smuggle placeholders past the
+  # awk strip — deny before stripping so opens and closes must pair up.
+  open=$(grep -cE '^<untrusted_context>[[:space:]]*$' <<<"$body")
+  close=$(grep -cE '^</untrusted_context>[[:space:]]*$' <<<"$body")
+  [[ "$open" -eq "$close" ]] ||
+    deny dispatch-check "unbalanced untrusted_context tag — close the block or wrap braces as data"
   # <untrusted_context> blocks are data to analyze, never instructions — strip them
   # before linting so wrapped third-party content can legitimately contain {{...}}.
   body=$(awk '
@@ -109,18 +116,17 @@ debug_gate() { # debug_gate <hook-input-json>
   return 0
 }
 
-# Canonical Task Block guard on Write to a docs/plan/*.plan.md. Write-only: Edit's
-# old_string/new_string is a partial view of the file, so Edit is not matched.
-plan_schema() { # plan_schema <hook-input-json>
-  local input="$1" file_path content missing
-  file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null) || return 0
-  case "${file_path//\\//}" in
-    */docs/plan/*.plan.md | docs/plan/*.plan.md) ;;
-    *) return 0 ;;
-  esac
-  content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
-  grep -qE '^Origin:[[:space:]]*\S' <<<"$content" ||
-    deny plan-schema "plan missing an 'Origin:' header (e.g. 'Origin: plan' or 'Origin: human')."
+# Shared plan-schema validator: file content on stdin, first violation text on
+# stdout (empty if valid). Both pre-tool (Write deny) and post-tool
+# (feedback-only) paths route through this. Short-circuits on Origin like the
+# original inline check.
+plan_schema_violations() {
+  local content missing
+  content=$(cat)
+  grep -qE '^Origin:[[:space:]]*\S' <<<"$content" || {
+    printf "plan missing an 'Origin:' header (e.g. 'Origin: plan' or 'Origin: human').\n"
+    return 0
+  }
   # Every ### TASK-NNN: block must carry all 7 Canonical Task Block field labels.
   missing=$(awk '
     BEGIN { split("Depends on|Files|Symbols|Satisfies|Action|Validate|Expected result", a, "|"); for (i in a) want[a[i]]=1 }
@@ -131,7 +137,21 @@ plan_schema() { # plan_schema <hook-input-json>
     function emit() { m=""; for (w in want) if (!(w in seen)) m=m (m==""?"":", ") w; if (m != "") printf "%s missing: %s\n", id, m }
   ' <<<"$content")
   [[ -z "$missing" ]] ||
-    deny plan-schema "plan has TASK block(s) missing Canonical Task Block field(s) — $(printf '%s' "$missing" | tr '\n' '; '): each ### TASK-NNN: block needs all 7 (Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result)."
+    printf 'plan has TASK block(s) missing Canonical Task Block field(s) — %s: each ### TASK-NNN: block needs all 7 (Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result).\n' "$(printf '%s' "$missing" | tr '\n' '; ')"
+}
+
+# Canonical Task Block guard on Write to a docs/plan/*.plan.md. Write-only: Edit's
+# old_string/new_string is a partial view of the file, so Edit is not matched.
+plan_schema() { # plan_schema <hook-input-json>
+  local input="$1" file_path content violations
+  file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null) || return 0
+  case "${file_path//\\//}" in
+    */docs/plan/*.plan.md | docs/plan/*.plan.md) ;;
+    *) return 0 ;;
+  esac
+  content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
+  violations=$(printf '%s' "$content" | plan_schema_violations)
+  [[ -z "$violations" ]] || deny plan-schema "$violations"
   return 0
 }
 
@@ -147,12 +167,43 @@ pre_tool() {
   exit 0
 }
 
+# ---------- post-tool ----------
+
+# PostToolUse plan-schema feedback: on Write|Edit|MultiEdit|NotebookEdit that
+# names a docs/plan/*.plan.md path, re-read the completed file from disk and
+# emit the missing-field violation to stderr, exit 2. Silent exit 0 otherwise
+# (including missing jq or unreadable file). Feedback-only — never a deny.
+post_tool() {
+  command -v jq >/dev/null 2>&1 || exit 0
+  local input tool file_path content violations
+  input=$(cat)
+  tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null)
+  case "$tool" in
+    Write | Edit | MultiEdit | NotebookEdit) ;;
+    *) exit 0 ;;
+  esac
+  file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null)
+  case "${file_path//\\//}" in
+    */docs/plan/*.plan.md | docs/plan/*.plan.md) ;;
+    *) exit 0 ;;
+  esac
+  [[ -r "${file_path//\\//}" ]] || exit 0
+  content=$(cat "${file_path//\\//}") || exit 0
+  violations=$(printf '%s' "$content" | plan_schema_violations)
+  if [[ -n "$violations" ]]; then
+    printf '%s\n' "$violations" >&2
+    exit 2
+  fi
+  exit 0
+}
+
 # ---------- dispatch ----------
 
 case "${1:-}" in
   session-start) session_start ;;
   dispatch-check) dispatch_check ;;
   pre-tool) pre_tool ;;
+  post-tool) post_tool ;;
   *)
     echo "squads: unknown rule '${1:-}'" >&2
     exit 0

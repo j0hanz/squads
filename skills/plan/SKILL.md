@@ -40,7 +40,7 @@ All draft/validate fan-outs scale with surface size — many small-task agents, 
 
 - **Slices (draft):** partition Step 1 candidate files into K clusters along directory/subsystem boundaries, ~12 files per slice (K = ceil(candidate_files / 12), min 1). K capped at floor(20 / lens_count) for the wave using it; over cap, merge smallest slices until it fits and say so in the announce line — silent caps read as full coverage.
 - **Chunks (validate):** partition plan Task Blocks into C groups of ≤5 consecutive blocks (C = ceil(task_count / 5)), same cap-and-log rule.
-- **Wave cap:** ≤20 agents per wave, dispatched in ONE message; ~10 run concurrently, rest queue (per dispatch-agents invariants); every agent runs `model: 'haiku'` with a flat 5-min branch budget.
+- **Wave cap:** ≤20 agents per wave, dispatched in ONE message; ~10 run concurrently, rest queue (per dispatch-agents invariants); model and per-branch timeout per [dispatch-agents #model--fan-out-policy](../dispatch-agents/SKILL.md#model--fan-out-policy) / [#invariants--apply-to-every-dispatch](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch).
 - **Small-task rule:** every dispatched agent is scoped to one slice, chunk, or lens — whole-surface context belongs only to the final merger (Step 3) and the spec-coherence critic (Step 8).
 
 At K=1 and C=1 every wave degenerates to the pre-scaling shape (2/3 ideators, 1/3 critics).
@@ -117,14 +117,14 @@ Print the `N_passed / N_total` table per category BEFORE any critic dispatch —
 
 ### Step 8: Critic Fan-out
 
-Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer context — judge ≠ generator.
+Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer context — per [dispatch-agents #invariants--apply-to-every-dispatch](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) (judge ≠ generator).
 
 - **`contract`** — one critic per chunk (C total, per [Fan-out Scaling](#fan-out-scaling)), all three lenses in a single pass, lighter check focused on scope boundaries and dependency cycles.
 - **`blueprint`** — lens × chunk matrix (3 × C critics) plus 1 whole-spec **coherence critic** reading specs.md only, judging REQ-vs-REQ contradictions and ambiguity. All in ONE message (parallel, `run_in_background: false`), blind to each other. 3 × C + 1 over the wave cap → grow chunk size until it fits, log it.
 
 Every chunk critic receives: its chunk's full Task Blocks, the REQ text blocks those tasks cite, and a one-line-per-task digest of the whole plan (`TASK-NNN | title | Files | Depends on`) so cross-chunk `Depends on:` references resolve. Chunk critics never judge tasks outside their chunk.
 
-Critics run `model: 'haiku'` (rubric checks need no premium model). First round: critics sweep freely per lens. **Re-validation round (after a REVISE):** dispatch one critic per lens (not the full matrix), each receiving the prior round's findings for its lens, judging ONLY whether each is resolved — no fresh sweep. Volunteered new findings are recorded as plan-header comments, never enter the verdict unless High — fresh full sweeps each round find new Meds forever and never converge.
+Critics run per [dispatch-agents #model--fan-out-policy](../dispatch-agents/SKILL.md#model--fan-out-policy) (rubric checks need no premium model). First round: critics sweep freely per lens. **Re-validation round (after a REVISE):** dispatch one critic per lens (not the full matrix), each receiving the prior round's findings for its lens, judging ONLY whether each is resolved — no fresh sweep. Volunteered new findings are recorded as plan-header comments, never enter the verdict unless High — fresh full sweeps each round find new Meds forever and never converge.
 
 Lens rubrics (each critic returns findings per its lens):
 
@@ -140,7 +140,7 @@ Each critic returns itemized findings with `file:line` / `REQ-id` / `TASK-id` sp
 
 ### Step 9: Main Thread Verdict
 
-Read all critic findings directly — no Arbiter agent. Dedupe by exact `(lens, REQ-id|TASK-id, file:line)` tuple across critics. Apply thresholds to the deduped set:
+Read all critic findings directly — no Arbiter agent (per [dispatch-agents #invariants--apply-to-every-dispatch](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch)). Dedupe by exact `(lens, REQ-id|TASK-id, file:line)` tuple across critics. Apply thresholds to the deduped set:
 
 - Any **High** → REVISE.
 - Deduped **Meds** ≥ max(2, ceil(N_critics / 2)) — OR ≥2 deduped Meds citing the same TASK-NNN or REQ-NNN — → REVISE. Meds from different lenses corroborate — count separately, never collapse to one.

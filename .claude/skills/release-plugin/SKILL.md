@@ -39,17 +39,18 @@ git log <last-tag>..HEAD --oneline       # commits since then
    git grep -n "\"version\": \"<OLD>\"" -- package.json .claude-plugin/plugin.json .claude-plugin/marketplace.json   # must print zero
    git grep -c "\"version\": \"<NEW>\"" -- package-lock.json   # must print 2
    ```
-3. **Validate**: run exactly `claude plugin validate . --strict` — must pass before committing.
-4. **Commit** (stage only the 4 version files):
+3. **Drift check**: re-read `docs/skills-hooks-drift-matrix.md` against `skills/` and `hooks/`; update the matrix and any offending docs on drift, before tagging.
+4. **Validate**: run exactly `claude plugin validate . --strict` — must pass before committing.
+5. **Commit** (stage only the 4 version files):
    ```bash
    git add package.json package-lock.json .claude-plugin/plugin.json .claude-plugin/marketplace.json
    git commit -m "chore: bump version to <NEW>"
    ```
-5. **Tag**: `git tag -a v<NEW> -m "Version <NEW>"`.
-6. **Confirm with the user before pushing** — push is visible to others and not easily reversible.
-7. **Push**: `git push origin master && git push origin v<NEW>`.
-8. **Release**: `gh release create v<NEW> --title "v<NEW>" --notes "<notes>"`, notes summarizing the commits since `<last-tag>` grouped by fix/feat/etc.
-9. **Finalize**: `git status` must show a clean working tree.
+6. **Tag**: `git tag -a v<NEW> -m "Version <NEW>"`.
+7. **Confirm with the user before pushing** — push is visible to others and not easily reversible.
+8. **Push**: `git push origin master && git push origin v<NEW>`.
+9. **Release**: `gh release create v<NEW> --title "v<NEW>" --notes "<notes>"`, notes summarizing the commits since `<last-tag>` grouped by fix/feat/etc.
+10. **Finalize**: `git status` must show a clean working tree.
 
 ## Explicitly out of scope for this repo
 

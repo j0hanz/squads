@@ -1,5 +1,5 @@
 {
-  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.",
+  "description": "Session router injection plus deterministic guards for subagent dispatch hygiene and the parallel-debugging hard gate. One dispatcher script, one <rule> arg per entry. PreToolUse Skill/Write/Edit/MultiEdit/NotebookEdit/Bash consolidate into one `pre-tool` entry (one stdin read, one jq per arm) running debug-gate then tdd-gate then plan-schema in strictest-first order. Command is a single quoted string — Claude Code runs it through /bin/bash -c, so an unquoted Windows ${CLAUDE_PLUGIN_ROOT} loses its backslashes (args exec-form is joined unquoted and breaks on win32). R2 residual: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.",
   "hooks": {
     "SessionStart": [
       {
@@ -29,27 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" debug-gate",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" tdd-gate",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" plan-schema",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool",
             "timeout": 30
           }
         ]

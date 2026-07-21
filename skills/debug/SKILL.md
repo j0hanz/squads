@@ -26,7 +26,7 @@ One-line reproduce-then-find handles most bugs. Fan out parallel hypothesis inve
 - Several credible hypotheses compete — including ones named by report, stack trace, or caller graph (fan out now, no single-threaded best-first).
 - Bug spans modules; multiple causes could explain it.
 
-Single-thread only when the stack trace's top frame IS the root-cause line (where the bad code lives, not where the crash pops) AND `git grep` shows ≤1 caller — else fan out. Obvious one-line bug: single-thread Steps 1–2 (one hypothesis, investigate inline with same structured return), then two fresh skeptics with distinct refutation angles in Step 3 — an investigation is a hypothesis, not a finding, even single-threaded. In doubt: single-thread Steps 1–2; fan out only when ≥2 hypotheses survive first repro.
+Single-thread only when the stack trace's top frame IS the root-cause line (where the bad code lives, not where the crash pops) AND `git grep` shows ≤1 caller — else fan out. Obvious one-line bug: single-thread Steps 1–2 (one hypothesis, investigate inline with the same structured return); skeptics dispatch via `debug-verify` in Step 2 (composed branch) — the degraded branch has no skeptic quorum — and results synthesize in Step 3. An investigation is a hypothesis, not a finding, even single-threaded. In doubt: single-thread Steps 1–2; fan out only when ≥2 hypotheses survive first repro.
 
 ## Invariants — apply to every dispatch
 

@@ -351,6 +351,136 @@ def self_check() -> None:
     ).encode()
     r = run_rule("dispatch-check", clean)
     assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
+
+    # --- pre-tool path assertions (TASK-005) ---
+    # Flag files live in the hook's bash state_dir (${TMPDIR:-/tmp}). On
+    # Windows, Python's /tmp ≠ git-bash's /tmp, so every create/test/remove
+    # of a flag file is routed through bash to share the hook's view.
+    _state_expr = "${TMPDIR:-/tmp}"
+
+    def _bash(script: str) -> bytes:
+        with suppress(Exception):
+            return subprocess.run(
+                [find_bash(), "-c", script],
+                capture_output=True,
+                timeout=2,
+            ).stdout
+        return b""
+
+    def _flag(pattern: str) -> bool:
+        return _bash(f'test -f "{_state_expr}/{pattern}" && echo y').strip() == b"y"
+
+    def _clean(sid: str) -> None:
+        _bash(
+            f'rm -f "{_state_expr}/squads-governor-{sid}"'
+            f' "{_state_expr}/squads-debug-gate-{sid}"'
+        )
+
+    # (1) governor-gate: squads:debug with no flag → deny, flag must not arm
+    sid = "schk-gov"
+    _clean(sid)
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:debug"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 2 and r["err"].startswith(b"squads governor-gate:"), r
+    assert not _flag(f"squads-governor-{sid}"), "governor deny must not arm the flag"
+    _clean(sid)
+
+    # (2) debug-gate: arm via squads:debug, then non-exempt Write denies,
+    # exempt *.md Write passes. Governor flag is armed by running
+    # squads:dispatch-agents first (bash creates the flag in its state_dir,
+    # which Python's /tmp does not share on Windows), so governor-gate then
+    # lets squads:debug through to arm the debug flag.
+    sid = "schk-dbg"
+    _clean(sid)
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:dispatch-agents"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0, r
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:debug"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and _flag(f"squads-debug-gate-{sid}"), r
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "src/x.go"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 2 and r["err"].startswith(b"squads debug-gate:"), r
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": "notes.md"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0, r
+    _clean(sid)
+
+    # (3) plan-schema: Write to docs/plan/x.plan.md missing Origin → deny
+    sid = "schk-plan"
+    _clean(sid)
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {
+                    "file_path": "docs/plan/x.plan.md",
+                    "content": "no Origin header here",
+                },
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 2 and r["err"].startswith(b"squads plan-schema:"), r
+    _clean(sid)
+
+    # (4) clean pre-tool: a non-Skill non-Write tool passes silent
+    sid = "schk-clean"
+    _clean(sid)
+    r = run_rule(
+        "pre-tool",
+        json.dumps(
+            {
+                "tool_name": "Read",
+                "tool_input": {"file_path": "README.md"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
+    _clean(sid)
+
     print("self-check OK")
 
 

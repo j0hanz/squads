@@ -43,6 +43,13 @@ is_exempt_path() { # is_exempt_path <basename> → 0 if exempt
   return 1
 }
 
+is_plan_path() { # is_plan_path <path> → 0 if a docs/plan/*.plan.md
+  case "${1//\\//}" in
+    */docs/plan/*.plan.md | docs/plan/*.plan.md) return 0 ;;
+  esac
+  return 1
+}
+
 # ---------- session-start ----------
 
 session_start() {
@@ -91,12 +98,10 @@ dispatch_check() {
 # Per-session flag file, reaped by session-start's 120-min sweep. Best-effort:
 # cannot catch a turn that follows a skill's flow without ever calling the Skill
 # tool. Runs BEFORE debug_gate so a denied squads:debug never arms the debug flag.
-governor_gate() { # governor_gate <hook-input-json>
-  local input="$1" tool skill sid flag
-  tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null) || return 0
+governor_gate() { # governor_gate <tool> <skill> <sid>
+  local tool="$1" skill="$2" sid="$3" flag
   [[ "$tool" == "Skill" ]] || return 0
-  skill=$(jq -r '.tool_input.skill // ""' <<<"$input" 2>/dev/null)
-  sid=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null | tr -cd 'a-zA-Z0-9-')
+  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
   flag="$(state_dir)/squads-governor-${sid:-unknown}"
   case "$skill" in
     squads:dispatch-agents | dispatch-agents) touch "$flag" ;;
@@ -114,14 +119,12 @@ governor_gate() { # governor_gate <hook-input-json>
 # denied until the root cause is routed to tdd / plan / review (which lifts the flag).
 # dispatch-agents is NOT a lift — it bypasses reproduce-first. Per-session flag file,
 # 120-min expiry backstop.
-debug_gate() { # debug_gate <hook-input-json>
-  local input="$1" tool sid skill file_path flag
-  tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null) || return 0
-  sid=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null | tr -cd 'a-zA-Z0-9-')
+debug_gate() { # debug_gate <tool> <skill> <sid> <file_path>
+  local tool="$1" skill="$2" sid="$3" file_path="$4" flag
+  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
   flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
   case "$tool" in
     Skill)
-      skill=$(jq -r '.tool_input.skill // ""' <<<"$input" 2>/dev/null)
       case "$skill" in
         squads:debug | debug) touch "$flag" ;;
         squads:tdd | tdd | squads:plan | plan | squads:review | review) rm -f "$flag" ;;
@@ -133,7 +136,6 @@ debug_gate() { # debug_gate <hook-input-json>
         rm -f "$flag"
         return 0
       fi
-      file_path=$(jq -r '.tool_input.file_path // .tool_input.notebook_path // ""' <<<"$input" 2>/dev/null)
       is_exempt_path "$(basename "${file_path//\\//}")" ||
         deny debug-gate "debug is active — its HARD GATE forbids code edits before the root cause is reproduced and routed to tdd (logic bug) or plan (design-level); review also lifts. If debugging was abandoned, remove $flag."
       ;;
@@ -167,14 +169,9 @@ plan_schema_violations() {
 
 # Canonical Task Block guard on Write to a docs/plan/*.plan.md. Write-only: Edit's
 # old_string/new_string is a partial view of the file, so Edit is not matched.
-plan_schema() { # plan_schema <hook-input-json>
-  local input="$1" file_path content violations
-  file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null) || return 0
-  case "${file_path//\\//}" in
-    */docs/plan/*.plan.md | docs/plan/*.plan.md) ;;
-    *) return 0 ;;
-  esac
-  content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
+plan_schema() { # plan_schema <file_path> <content>
+  local file_path="$1" content="$2" violations
+  is_plan_path "$file_path" || return 0
   violations=$(printf '%s' "$content" | plan_schema_violations)
   [[ -z "$violations" ]] || deny plan-schema "$violations"
   return 0
@@ -185,12 +182,22 @@ plan_schema() { # plan_schema <hook-input-json>
 # flags were never set either; nothing to enforce.
 pre_tool() {
   command -v jq >/dev/null 2>&1 || exit 0
-  local input tool
+  local input tool="" skill="" sid="" file_path="" content=""
   input=$(cat)
-  governor_gate "$input"
-  debug_gate "$input"
-  tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null)
-  [[ "$tool" == "Write" ]] && plan_schema "$input"
+  # Single jq for scalars; jq failure leaves locals empty → fail-open (no set -u abort).
+  local fields=()
+  mapfile -t fields < <(
+    jq -r '.tool_name // "", .tool_input.skill // "", .session_id // "",
+          (.tool_input.file_path // .tool_input.notebook_path // "")' <<<"$input" 2>/dev/null | tr -d '\r'
+  )
+  tool="${fields[0]:-}" skill="${fields[1]:-}" sid="${fields[2]:-}" file_path="${fields[3]:-}"
+  # governor_gate runs first; deny()→exit 2 structurally prevents debug_gate arming on a denied squads:debug.
+  governor_gate "$tool" "$skill" "$sid"
+  debug_gate "$tool" "$skill" "$sid" "$file_path"
+  [[ "$tool" == "Write" ]] && {
+    content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
+    plan_schema "$file_path" "$content"
+  }
   exit 0
 }
 
@@ -210,10 +217,7 @@ post_tool() {
     *) exit 0 ;;
   esac
   file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null)
-  case "${file_path//\\//}" in
-    */docs/plan/*.plan.md | docs/plan/*.plan.md) ;;
-    *) exit 0 ;;
-  esac
+  is_plan_path "$file_path" || exit 0
   [[ -r "${file_path//\\//}" ]] || exit 0
   content=$(cat "${file_path//\\//}") || exit 0
   violations=$(printf '%s' "$content" | plan_schema_violations)

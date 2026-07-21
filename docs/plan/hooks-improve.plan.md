@@ -7,7 +7,7 @@ Review pass: 1
 Source: docs/design/2026-07-21-hooks-improve-design.md
 Notes: Round-1 Meds (TASK-003 oversized; newline-strip wording; Validate coverage gap) and Lows (TASK-001 audit scope) resolved in REVISE — TASK-003 split into TASK-003/TASK-004, inline behavioral assertions added to Validate, TASK-001 widened to all four temp candidates. Round-2 re-validation: all findings resolved, no new High.
 
-Audit verdict: (filled by TASK-001 — per-candidate: TMPDIR=, TEMP=, TMP=, /tmp=; current resolution ${TMPDIR:-/tmp} = )
+Audit verdict: TASK-001 run 2026-07-21 — TMPDIR=<unset>; TEMP=C:\Users\PC\AppData\Local\Temp (writable); TMP=C:\Users\PC\AppData\Local\Temp (writable); /tmp (writable, MSYS mount). Current state_dir resolution ${TMPDIR:-/tmp} = /tmp → WRITABLE. TASK-006 = DROP (no code change).
 
 ## Tasks
 

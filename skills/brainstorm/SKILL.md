@@ -73,19 +73,21 @@ Look for a 10x simpler or zero-code solution. Found → seed as "Approach A" (Mi
 ## Phase 5: Persona Critique
 
 - **Trigger:** Phase 5 flag set, or user requests stress test.
-- **Simulated Review** — adopt 3 personas in thought, against chosen design:
+- **Dispatch Critics** — 3 fresh read-only subagents in ONE message (parallel Agent calls, `run_in_background: false`, write/edit tools denied, `model: 'haiku'` per [Model & fan-out policy](../dispatch-agents/SKILL.md#model--fan-out-policy)), blind to each other and to this conversation — judge ≠ generator per [dispatch-agents Invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch). Each critic receives ONLY the locked approach (What, Gains, Costs, Fit, First Step from Phase 4), the Constraints and Interface Shapes from the Context Report, and its persona charter:
 
 1. _Skeptic:_ edge cases, failure modes.
 2. _Constraint Guardian:_ scale, performance, security rules.
 3. _User Advocate:_ usability, cognitive load.
 
-- **Severity:** High (blocks deployment), Med (worse outcome), Low (minor). Ignore styling/naming.
-- **Resolution:** Record objections. Every High/Med: "Accept & Revise" or "Reject with technical rationale."
-- **Token Back-Pressure:** Before each REVISE cycle, summarize prior cycle's objections to ≤150 words and replace full prior-cycle content with the summary. Next cycle runs against summary + new design variant only.
-- **Self-Arbitration:** Resolve debate yourself. Mark `APPROVED`, `REVISE`, or `REJECT`.
-- **Routing:** `APPROVED` → Phase 6. `REVISE` → revise, resolve objections, re-arbitrate (loop until `APPROVED` or `REJECT`). `REJECT` → Phase 3 for new approaches, or direction infeasible → stop, report. Cap REVISE at 2 cycles; 3rd arbitration not `APPROVED` → treat as `REJECT`.
+- **Return shape:** findings per the [Handoff Contract](../dispatch-agents/SKILL.md#handoff-contract) — `{claim, location, severity}`, severity High (blocks deployment), Med (worse outcome), Low (minor). Ignore styling/naming. Malformed return → re-dispatch that critic once; second malformed → run that persona in-thread and log `[WARN] <persona> critique ran in-thread — self-review, not verification.`
+- **Resolution:** main thread reads findings directly — no Arbiter agent (hub-and-spoke). Dedupe across critics. Every High/Med: "Accept & Revise" or "Reject with technical rationale."
+- **Token Back-Pressure:** before each REVISE cycle, summarize prior cycle's objections to ≤150 words; the summary + revised design variant is the ONLY prior-cycle content the next critic wave receives.
+- **Re-validation round (REVISE):** dispatch one fresh critic per persona (no new sweep), each receiving its persona's prior objections + the revised design, judging ONLY whether each objection is resolved. Volunteered new findings are recorded, never enter the verdict unless High.
+- **Self-Arbitration:** main thread resolves the verdict. Mark `APPROVED`, `REVISE`, or `REJECT`.
+- **Routing:** `APPROVED` → Phase 6. `REVISE` → revise, dispatch re-validation round, re-arbitrate (loop until `APPROVED` or `REJECT`). `REJECT` → Phase 3 for new approaches, or direction infeasible → stop, report. Cap REVISE at 2 cycles; 3rd arbitration not `APPROVED` → treat as `REJECT`.
+- **Agent tool unavailable** (harness without subagents) → run all three personas in-thread and log `[WARN] persona critique ran in-thread — self-review, not verification.` Never silent.
 
-**Done when:** every High/Med objection accepted-and-revised or rejected-with-rationale; design `APPROVED` (→ Phase 6) or `REJECT` (→ Phase 3 or stop) — `REVISE` not terminal.
+**Done when:** every High/Med objection accepted-and-revised or rejected-with-rationale, and the verdict cites critic-returned findings (not main-thread-authored objections); design `APPROVED` (→ Phase 6) or `REJECT` (→ Phase 3 or stop) — `REVISE` not terminal.
 
 ## Phase 6: Design Brief
 
@@ -108,7 +110,7 @@ Look for a 10x simpler or zero-code solution. Found → seed as "Approach A" (Mi
 ## Strict Rules
 
 - **No Blended Ideation:** Phase 3 perspectives stay distinct until Phase 4 synthesis.
-- **No Agent-tool subagents in any phase.**
+- **No Agent-tool subagents in ideation — Phases 1–4 and 6.** Phase 5 dispatches persona critics, the only subagent use in this skill.
 
 ## Next Skills
 

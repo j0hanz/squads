@@ -87,7 +87,7 @@ Save both files with headers `Status: DRAFT`, `Depth: <sketch|contract|blueprint
 
 ### Headless Fallback (REVISE from validate mode)
 
-Re-run synthesis only — don't re-dispatch ideators. Re-run the final merge only — never re-dispatch ideators or per-slice mergers. `contract`: main thread re-synthesizes with REVISE findings as constraints. `blueprint`: re-dispatch the Synthesizer with REVISE findings; it returns revised content for BOTH files — specs.md fixes included, never patched ad hoc by the main thread — and the main thread writes both. Re-submit to validate mode. Second REVISE → write a detailed error summary, notify user high-priority, stop (no `AskUserQuestion`).
+Re-run the final merge only — never re-dispatch ideators or per-slice mergers. `contract`: main thread re-synthesizes with REVISE findings as constraints. `blueprint`: re-dispatch the Synthesizer with REVISE findings; it returns revised content for BOTH files — specs.md fixes included, never patched ad hoc by the main thread — and the main thread writes both. Re-submit to validate mode. Second REVISE → write a detailed error summary, notify user high-priority, stop (no `AskUserQuestion`).
 
 ## Validate Mode
 
@@ -115,7 +115,7 @@ Main thread runs grep/file-read directly — no subagent, no shell. Verify all b
 
 Print the `N_passed / N_total` table per category in the output BEFORE any critic dispatch — no printed table, no Step 8. Any `N_passed < N_total` → REVISE with itemized failures, skip Step 8.
 
-### Step 8: Critic Fan-out (blueprint) or Single Critic (contract)
+### Step 8: Critic Fan-out
 
 Dispatch critics (write/edit tools denied). Each critic is a FRESH subagent that never saw ideator/Synthesizer drafting context — judge ≠ generator.
 

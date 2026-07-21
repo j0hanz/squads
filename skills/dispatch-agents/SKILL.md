@@ -18,7 +18,7 @@ Native dynamic workflows are a hard dependency for composed mode. Check per [for
 
 ### Hook-fire probe (observability, REQ-OBS)
 
-Governor itself — MAIN-THREAD, never a subagent (hub-and-spoke; subagents can't dispatch subagents or see main-thread hook stdout) — makes one Agent call whose prompt contains the literal unresolved placeholder `probe {{squads-hook-probe}}`. Expected: call **DENIED** by PreToolUse with a `squads dispatch-check:` message naming the placeholder. Deny seen → say "hook fire confirmed (deny observed)", continue. Call goes through (subagent replies) → hook NOT firing; say "hook not observable for live tool calls — file-state guards (the `pre-tool` debug-gate flag) are best-effort only", continue — never silently assume guards fire. The probe MUST expect a deny, not an `ok` line: clean dispatch is silent BY DESIGN — `squads-hook.sh` `dispatch-check` emits stdout only on deny or cap events. A denied call never runs, so the probe is free. Probe once per context window: a prior probe verdict visible in this conversation ("hook fire confirmed" or "hook not observable") stands — skip the probe and restate the standing verdict in one line. Re-probe only when a fresh `<squads-router>` injection has appeared since the last verdict (startup, resume, clear, and compact each re-run the session-start hook). The conversation is the cache — no hook or file state involved.
+Governor itself — MAIN-THREAD, never a subagent (hub-and-spoke; subagents can't dispatch subagents or see main-thread hook stdout) — makes one Agent call whose prompt contains the literal unresolved placeholder `probe {{squads-hook-probe}}`. Expected: call **DENIED** by PreToolUse with a `squads dispatch-check:` message naming the placeholder. Deny seen → say "hook fire confirmed (deny observed)", continue. Call goes through (subagent replies) → hook NOT firing; say "hook not observable for live tool calls — file-state guards (the `pre-tool` debug-gate flag) are best-effort only", continue — never silently assume guards fire. The probe MUST expect a deny, not an `ok` line: clean dispatch is silent BY DESIGN — `squads-hook.sh` `dispatch-check` writes nothing on a clean pass and only ever emits a deny (stderr, exit 2). A denied call never runs, so the probe is free. Probe once per context window: a prior probe verdict visible in this conversation ("hook fire confirmed" or "hook not observable") stands — skip the probe and restate the standing verdict in one line. Re-probe only when a fresh `<squads-router>` injection has appeared since the last verdict (startup, resume, clear, and compact each re-run the session-start hook). The conversation is the cache — no hook or file state involved.
 
 <!-- do not rename: skills link #governor-threshold-table -->
 
@@ -166,7 +166,7 @@ Update task status only on state transition (pending→in_progress at start, in_
 
 **Batch related fixes before re-verifying** — one re-audit covers multiple fixes.
 
-**Skip the verify workflow when the changeset is hook-only AND the test suite already covers the changed branch** — suite = verification.
+**Skip the verify workflow when the changeset is confined to hook scripts AND an existing self-check/suite already covers the changed branch** — suite = verification.
 
 **Granularity rule:** worker tasks must be haiku-sized (bounded files, one behavior, runnable `Validate:`). Oversized tasks were plan's job to decompose — refuse them back to plan, never hand a big job to one agent.
 

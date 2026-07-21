@@ -23,7 +23,7 @@ dispatch-agents routing tables are canonical; the squads card mirrors — on mis
 | Verified diff to review; review feedback to resolve                                                   | [review](../review/SKILL.md)                   |
 | Recurring bulk (any size), whole-repo audit, saved `/command` workflow                                | [forge-workflow](../forge-workflow/SKILL.md)   |
 
-Pipeline: `brainstorm → plan → dispatch-agents → {tdd | debug} → review → (FAIL re-fix → dispatch-agents)`. `forge-workflow` orthogonal — composed/bulk runs and saved `/command` workflows, fed by Governor Composition Specs.
+Pipeline: `brainstorm → plan → dispatch-agents → {tdd | debug} → review → (FAIL → review resolve, re-review ≤ 2)`. `forge-workflow` orthogonal — composed/bulk runs and saved `/command` workflows, fed by Governor Composition Specs.
 
 Each skill's `## Next Skills` table owns its outgoing edges; on conflict, skill table wins — update this card to match.
 

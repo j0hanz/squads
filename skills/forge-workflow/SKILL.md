@@ -93,6 +93,25 @@ One session-scoped pass per workflow. Steps sequential; each gates the next.
 
 **First-use starters.** No `docs/workflows/CATALOG.md` (or empty) → offer three starters and compose one on pick: `debug-verify`, `fan-out-synthesize`, `adversarial-verify`. Each maps 1:1 to its catalog row; no improvisation. Skipped when a Composition Spec is supplied.
 
+**Post-canonical-edit re-audit.** After editing Pattern Canon / a Generation Contract invariant / the quorum table / a Recipe Catalog row, run [Catalog re-audit](#catalog-re-audit) against existing generated workflows.
+
+## Catalog re-audit
+
+When the Pattern Canon, the Generation Contract invariants, or the Recipe Catalog change, previously-generated workflows in a project's `docs/workflows/CATALOG.md` can drift: they still run, but against a stale contract. Re-audit them.
+
+**Trigger:** the maintainer edits any of — Pattern Canon (`## Pattern Canon`), a Generation Contract invariant (`## Generation Contract`), the quorum table, or a Recipe Catalog row. The canon has no version number; the trigger is a manual decision after such an edit, not automatic.
+
+**Procedure (per CATALOG row):**
+
+1. Read the row's `recipe` and open its `.claude/workflows/<name>.js`.
+2. Re-run the [Script Audit Checklist](#script-audit-checklist) against it, as if at save time. Every HIGH item must pass; inline one-liners apply unchanged.
+3. Record the result in CATALOG.md's `last-verified` column (re-verified date) and a one-word verdict: `PASS` (all HIGH pass) or `DRIFT` (any HIGH fails).
+4. DRIFT verdicts are reported to the maintainer with the failing item(s); the maintainer decides re-generate vs. accept-stale. Do not auto-regenerate — a stale workflow that still works may be intentionally pinned.
+
+**No-noise rule:** report only HIGH-severity drift. Lower-severity items (a missing ask-before-overwrite re-confirm, a reformatted prompt) are informational; they do not block and are not surfaced as DRIFT.
+
+**Escape hatch:** a project with no `docs/workflows/CATALOG.md` (or empty) has nothing to re-audit — no-op.
+
 ## Script Audit Checklist
 
 Run before save. Failed HIGH items block save; lower items warn and continue.

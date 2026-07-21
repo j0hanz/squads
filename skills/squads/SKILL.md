@@ -11,15 +11,17 @@ Router card. Every concrete task enters [dispatch-agents](../dispatch-agents/SKI
 
 ## Route
 
-| Trigger                                                              | Skill                                          |
-| :------------------------------------------------------------------- | :--------------------------------------------- |
-| Any new task/request; APPROVED `docs/plan/*.plan.md`; doubt          | [dispatch-agents](../dispatch-agents/SKILL.md) |
-| Vague requirements, open solution space, ≥2 architectural approaches | [brainstorm](../brainstorm/SKILL.md)           |
-| Named feature needing plan/spec; plan/specs pair to validate         | [plan](../plan/SKILL.md)                       |
-| Single new logic behavior; TDD red flag                              | [tdd](../tdd/SKILL.md)                         |
-| Test, `Validate:`, or runtime fails unexpectedly — before any fix    | [debug](../debug/SKILL.md)                     |
-| Verified diff to review; review feedback to resolve                  | [review](../review/SKILL.md)                   |
-| Bulk/recurring fan-out, whole-repo audit, saved `/command` workflow  | [forge-workflow](../forge-workflow/SKILL.md)   |
+dispatch-agents routing tables are canonical; the squads card mirrors — on mismatch, dispatch-agents wins.
+
+| Trigger                                                                                               | Skill                                          |
+| :---------------------------------------------------------------------------------------------------- | :--------------------------------------------- |
+| Any new task/request; APPROVED `docs/plan/*.plan.md`; doubt                                           | [dispatch-agents](../dispatch-agents/SKILL.md) |
+| Problem to explore, no deliverable shape yet                                                          | [brainstorm](../brainstorm/SKILL.md)           |
+| Request names a deliverable artifact (plan/spec/doc for a named feature); plan/specs pair to validate | [plan](../plan/SKILL.md)                       |
+| Single new logic behavior; TDD red flag                                                               | [tdd](../tdd/SKILL.md)                         |
+| Test, `Validate:`, or runtime fails unexpectedly — before any fix                                     | [debug](../debug/SKILL.md)                     |
+| Verified diff to review; review feedback to resolve                                                   | [review](../review/SKILL.md)                   |
+| Recurring bulk (any size), whole-repo audit, saved `/command` workflow                                | [forge-workflow](../forge-workflow/SKILL.md)   |
 
 Pipeline: `brainstorm → plan → dispatch-agents → {tdd | debug} → review → (FAIL re-fix → dispatch-agents)`. `forge-workflow` orthogonal — composed/bulk runs and saved `/command` workflows, fed by Governor Composition Specs.
 

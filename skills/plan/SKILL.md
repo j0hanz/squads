@@ -1,6 +1,6 @@
 ---
 name: plan
-description: Use when the user asks for a plan, spec, or design doc for a named feature, or a plan/specs pair needs validation. Not when ≥2 architectural approaches are open — use brainstorm first.
+description: Use when the user asks for a named deliverable artifact (plan/spec/doc for a named feature), or a plan/specs pair needs validation. Not when the request is a problem to explore with no deliverable shape — use brainstorm first.
 argument-hint: '[--depth sketch|contract|blueprint] <feature description> | <plan-path> [specs-path]'
 ---
 

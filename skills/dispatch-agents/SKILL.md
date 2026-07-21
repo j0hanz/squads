@@ -10,6 +10,8 @@ argument-hint: '[fleet task, or path to an approved docs/plan/*.plan.md]'
 
 Every task starts here. Governor checks preflight, picks mode via the Threshold Table, then routes: inline (fixed routing table) for small/no-runtime work, or composed (Composition Spec for forge-workflow) for big/fan-out work. No build, no plan, no fix before Governor says go. The hook enforces this where it can: `squads-hook.sh` `governor-gate` denies any other squads skill invocation until dispatch-agents has been invoked once this session (best-effort — it cannot catch a turn that never calls the Skill tool).
 
+dispatch-agents routing tables are canonical; the squads card mirrors — on mismatch, dispatch-agents wins.
+
 ### Preflight (first gate)
 
 Native dynamic workflows are a hard dependency for composed mode. Check per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight). Any fail → composed OFF, inline only. No silent degrade inside forge.
@@ -18,33 +20,38 @@ Native dynamic workflows are a hard dependency for composed mode. Check per [for
 
 Governor itself — MAIN-THREAD, never a subagent (hub-and-spoke; subagents can't dispatch subagents or see main-thread hook stdout) — makes one Agent call whose prompt contains the literal unresolved placeholder `probe {{squads-hook-probe}}`. Expected: call **DENIED** by PreToolUse with a `squads dispatch-check:` message naming the placeholder. Deny seen → say "hook fire confirmed (deny observed)", continue. Call goes through (subagent replies) → hook NOT firing; say "hook not observable for live tool calls — file-state guards (the `pre-tool` debug-gate flag) are best-effort only", continue — never silently assume guards fire. The probe MUST expect a deny, not an `ok` line: clean dispatch is silent BY DESIGN — `squads-hook.sh` `dispatch-check` emits stdout only on deny or cap events. A denied call never runs, so the probe is free. Probe once per context window: a prior probe verdict visible in this conversation ("hook fire confirmed" or "hook not observable") stands — skip the probe and restate the standing verdict in one line. Re-probe only when a fresh `<squads-router>` injection has appeared since the last verdict (startup, resume, clear, and compact each re-run the session-start hook). The conversation is the cache — no hook or file state involved.
 
+<!-- do not rename: skills link #governor-threshold-table -->
+
 ### Governor Threshold Table (first-match, decides mode)
 
-| Signal                                                                                                                       | → mode / class                                        |
-| ---------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Preflight fails (see §Preflight above)                                                                                       | composed OFF; inline only                             |
-| Explicit "make/build a workflow"                                                                                             | composed                                              |
-| Lifecycle match (failure→debug · diff/feedback→review · feature→plan · vague/≥2 approaches→brainstorm · single behavior→tdd) | inline                                                |
-| Bulk: keyword {audit, every, all, across, each} AND independent items ≥ 5                                                    | composed                                              |
-| Trivial: single file · one edit · typo · ≤ 1 item                                                                            | inline                                                |
-| Doubt                                                                                                                        | inline (escalation seam recovers under-orchestration) |
-| Class default                                                                                                                | read-only; fetch/edit only on demand + approval       |
+| Signal                                                                                                                                               | → mode / class                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Preflight fails (see §Preflight above)                                                                                                               | composed OFF; inline only                             |
+| Explicit "make/build a workflow"                                                                                                                     | composed                                              |
+| Lifecycle match (failure→debug · diff/feedback→review · feature→plan · problem-to-explore→brainstorm · named-deliverable→plan · single behavior→tdd) | inline                                                |
+| Bulk: recurring (any size) → composed/forge; one-off ≥ cutoff (currently 5) → composed                                                               | composed                                              |
+| Bulk: one-off < cutoff (currently 5) → inline fleet                                                                                                  | inline                                                |
+| Trivial: single file · one edit · typo · ≤ 1 item                                                                                                    | inline                                                |
+| Doubt                                                                                                                                                | inline (escalation seam recovers under-orchestration) |
+| Class default                                                                                                                                        | read-only; fetch/edit only on demand + approval       |
 
-Threshold Table picks mode FIRST. The inline routing table below applies only when mode = inline; bulk requests go composed, never to the inline forge row.
+Threshold Table picks mode FIRST. The inline routing table below applies only when mode = inline; recurring bulk and one-off bulk ≥ the cutoff go composed; one-off bulk below the cutoff routes inline — all stated, never silent.
+
+<!-- do not rename: skills link #inline-branch-routing-table -->
 
 ### INLINE branch — routing table
 
 Classify the request (first match wins), route to workflow, pick fleet shape.
 
-| Incoming request                                                                       | Workflow                                                                            | Fleet decision                                                                                                                                                                                                                                                 |
-| -------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Vague requirements, open solution space, ≥2 distinct architectural approaches          | [brainstorm](../brainstorm/SKILL.md)                                                | None in ideation (Phases 1–4, 6); Phase 5 dispatches 3 persona critics (haiku, read-only)                                                                                                                                                                      |
-| Clear feature or change needing a plan or spec                                         | [plan](../plan/SKILL.md) (draft → validate modes)                                   | Sized by [plan §Fan-out Scaling](../plan/SKILL.md#fan-out-scaling) — lens × slice ideators (sketch 0), chunked critics — sketch skips validate, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per plan Step 5 |
-| APPROVED `docs/plan/*.plan.md` in hand                                                 | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                                       |
-| Single new logic behavior, no plan needed, or TDD red flag                             | [tdd](../tdd/SKILL.md)                                                              | One worker; review supplies fresh eyes                                                                                                                                                                                                                         |
-| Test, `Validate:` command, or runtime fails unexpectedly — before any fix              | [debug](../debug/SKILL.md)                                                          | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                               |
-| Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                             |
-| Bulk independent items, whole-repo audit, or unbiased judging of this context's work   | [forge-workflow](../forge-workflow/SKILL.md) (generate a native `/<name>` workflow) | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                         |
+| Incoming request                                                                        | Workflow                                                                            | Fleet decision                                                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Problem to explore, no deliverable shape yet                                            | [brainstorm](../brainstorm/SKILL.md)                                                | None in ideation (Phases 1–4, 6); Phase 5 dispatches 3 persona critics (haiku, read-only)                                                                                                                                                                      |
+| Request names a deliverable artifact (plan/spec/doc for a named feature)                | [plan](../plan/SKILL.md) (draft → validate modes)                                   | Sized by [plan §Fan-out Scaling](../plan/SKILL.md#fan-out-scaling) — lens × slice ideators (sketch 0), chunked critics — sketch skips validate, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per plan Step 5 |
+| APPROVED `docs/plan/*.plan.md` in hand                                                  | Executing an approved plan (below); single focused task → [tdd](../tdd/SKILL.md)    | Workers sized by the `Depends on:` / `Files:` task graph                                                                                                                                                                                                       |
+| Single new logic behavior, no plan needed, or TDD red flag                              | [tdd](../tdd/SKILL.md)                                                              | One worker; review supplies fresh eyes                                                                                                                                                                                                                         |
+| Test, `Validate:` command, or runtime fails unexpectedly — before any fix               | [debug](../debug/SKILL.md)                                                          | One investigator per hypothesis + fresh skeptics                                                                                                                                                                                                               |
+| Verified diff awaiting review, or review feedback (human, bot, or subagent) to resolve  | [review](../review/SKILL.md) (request / resolve modes)                              | Request: 1 fresh read-only reviewer. Resolve: main thread verifies findings; re-review capped at 2                                                                                                                                                             |
+| Recurring bulk (any size), whole-repo audit, or unbiased judging of this context's work | [forge-workflow](../forge-workflow/SKILL.md) (generate a native `/<name>` workflow) | Fan out — one agent per chunk, cap ~10                                                                                                                                                                                                                         |
 
 Two rows fit? Earlier wins by lifecycle: ideation before planning, planning before execution; failure reproduced (debug) before fix (tdd) regardless of row order. One-shot edits and simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size → go smaller; every fan-out multiplies token cost.
 
@@ -175,11 +182,11 @@ Multi-milestone work has three roles — all inherit the flat [Model & fan-out p
 
 ## Next Skills
 
-| Skill                                        | Use Case                                                                             |
-| :------------------------------------------- | :----------------------------------------------------------------------------------- |
-| [brainstorm](../brainstorm/SKILL.md)         | Vague requirements, open solution space, ≥2 architectural approaches                 |
-| [plan](../plan/SKILL.md)                     | Draft a plan/spec, or validate an existing pair (contract/blueprint)                 |
-| [tdd](../tdd/SKILL.md)                       | Single new logic behavior, or a TDD red flag                                         |
-| [debug](../debug/SKILL.md)                   | Test, `Validate:`, or runtime fail unexpectedly — before any fix                     |
-| [review](../review/SKILL.md)                 | Fresh-eye review of a verified diff, or resolve review feedback                      |
-| [forge-workflow](../forge-workflow/SKILL.md) | Bulk independent items, whole-repo audit, or unbiased judging of this context's work |
+| Skill                                        | Use Case                                                                                |
+| :------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| [brainstorm](../brainstorm/SKILL.md)         | Problem to explore, no deliverable shape yet                                            |
+| [plan](../plan/SKILL.md)                     | Draft a plan/spec, or validate an existing pair (contract/blueprint)                    |
+| [tdd](../tdd/SKILL.md)                       | Single new logic behavior, or a TDD red flag                                            |
+| [debug](../debug/SKILL.md)                   | Test, `Validate:`, or runtime fail unexpectedly — before any fix                        |
+| [review](../review/SKILL.md)                 | Fresh-eye review of a verified diff, or resolve review feedback                         |
+| [forge-workflow](../forge-workflow/SKILL.md) | Recurring bulk (any size), whole-repo audit, or unbiased judging of this context's work |

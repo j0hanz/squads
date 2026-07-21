@@ -110,7 +110,7 @@ Any of these means you left TDD — same fix every time. No arguing; no "adaptin
 - Tests retrofitted to written code ("tests-after"), or a test edited to force a pass.
 - Self-talk: "too simple to test", "manually tested it", "tests after achieve the same purpose", "spirit matters", "this is different because...".
 - N-1 check skipped on the first behavior because it "obviously would fail" — a test not seen failing tests nothing.
-- GREEN arrives on first run with no RED observed for the behavior.
+- GREEN arrives on first run with no RED observed for the behavior. GREEN-without-RED is a test-discipline failure (the test is wrong, not the code) — owned by tdd, not debug.
 - Code-first output kept "as reference" or "to adapt" instead of deleted.
 
 **All of these mean:** delete the code-first implementation, re-enter the cycle at RED, run the test and confirm failure before re-implementing.

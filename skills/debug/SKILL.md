@@ -1,6 +1,6 @@
 ---
 name: debug
-description: Use when a test, Validate command, or runtime behavior fails unexpectedly — before any fix. Prefer over tdd when the bug must be reproduced and isolated, not implemented fresh.
+description: Use when a test, Validate command, or runtime behavior goes RED unexpectedly (an actual failure, not a suspicious pass) — before any fix. Prefer over tdd when the bug must be reproduced and isolated, not implemented fresh.
 argument-hint: '[symptom: failing test, command, or error]'
 ---
 
@@ -17,6 +17,7 @@ Route away, no debug:
 - **Plan or spec wrong:** go [plan](../plan/SKILL.md) to re-draft.
 - **Repro test already run and seen failing** (and `tdd` didn't send here): gate satisfied — go `tdd` with the test as RED.
 - **`tdd` sent here after failed GREEN attempt on same test:** repro gate met — go direct to Step 2, find why code won't pass.
+- **GREEN-without-RED (test passes without an observed failing test):** go `tdd`, not debug — suspicious pass is a test-discipline failure, not a real RED.
 
 ## First: do you need a fleet?
 
@@ -52,7 +53,9 @@ All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-t
 
 ## Step 2: Invoke debug-verify
 
-**Preflight** (once per session): assert composed-mode preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight); stop with clear message on fail. **No fallback** — never degrade to turn-by-turn Agent dispatch; in-script truncation, quorum tally, and agent-count cap are unenforceable outside the runtime.
+**Preflight** (once per session): assert composed-mode preflight per [forge-workflow §Preflight](../forge-workflow/SKILL.md#preflight); stop with clear message on fail. **No fallback** to turn-by-turn Agent dispatch for the debug-verify recipe — in-script truncation, quorum tally, and agent-count cap are unenforceable outside the runtime. (The degraded branch below is main-thread single-thread work, not Agent dispatch — so it does not fall under this rule.)
+
+**Degraded branch** (preflight fail, native dynamic workflows unavailable): do NOT abort — fall back to single-thread inline reproduce + isolate. Run the Step 1 reproduce on the main thread, form ONE hypothesis from the repro/stack trace/failing-function callers, investigate it inline with the same structured return, then route the fix per Step 4 (logic bug → `tdd`, design-level → `plan`). This is a degraded mode — no skeptic quorum, no in-script truncation guardrails. It is orthogonal to test-state classification: runtime availability and test-state are disjoint axes.
 
 List distinct root-cause hypotheses (from repro, stack trace, failing function's callers). Write the rubric a confirmed root cause must meet _before_ invoking — single-thread included (criteria before dispatch): reproduces the symptom, all failing paths go through it, classification named. Then invoke forge-workflow's [`debug-verify` recipe](../forge-workflow/SKILL.md#recipe-catalog) with `args={hypotheses[], repro_cmd, failing_output, rubric}`. The script enforces the guardrails in code — blind read-only investigators, bare-claim truncation, distinct-angle skeptics, canonical quorum, `(file:line, classification)` dedupe, no-survivor/ceiling stop — see the catalog entry; it is strictly [read-only class](../forge-workflow/SKILL.md#read-only-class), and the `squads-hook.sh` `pre-tool` debug-gate rule blocks main-thread edits regardless.
 

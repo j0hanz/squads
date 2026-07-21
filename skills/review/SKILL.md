@@ -10,8 +10,11 @@ Fresh-eye review of a verified diff, or resolve review feedback. Two modes, argu
 
 ## Step 0: Infer Mode
 
-- Argument **single token** (no whitespace): empty, or token resolves via `git rev-parse --verify <arg>` or is an existing path → **request** mode (fresh review of target, or uncommitted working tree if empty).
-- Argument **multi-token or multi-line**: always **resolve** mode — whole argument is feedback prose, never a ref/path candidate.
+- a ref/path token — `git rev-parse --verify <arg>` succeeds, or arg is a branch / commit / PR# (`#NNN`, `PR NN`) / file path — → **request** mode
+- feedback prose (non-ref) → **resolve** mode
+- both signals present → request wins
+- neither signal → `AskUserQuestion`
+- empty arg → request mode (uncommitted working tree)
 
 ## Request Mode
 

@@ -25,7 +25,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json`, 30s PreToolUse timeout). Note: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.
+> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and `jq` on PATH (the hook guards fail closed without it — Windows: `winget install jqlang.jq`; macOS: `brew install jq`; Linux: `apt/dnf install jq`). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json`, 30s PreToolUse timeout). Note: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.
 
 ## Usage
 
@@ -53,6 +53,16 @@ user request → dispatch-agents (Governor: pick workflow + fleet)
 ```
 
 > **Platform requirement**: native dynamic workflows are a hard dependency — Claude Code (CC) ≥ 2.1.154, paid plan required.
+
+## Development
+
+No build step. Checks:
+
+```bash
+npm ci && npm run format:check   # bash -n on hooks + prettier (needs Node for the formatter only)
+ruff check .                     # Python lint (config in pyproject.toml)
+python -m pytest                 # scan_context suite
+```
 
 ## License
 

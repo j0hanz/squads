@@ -26,9 +26,6 @@
     "code-review"
   ],
   "private": true,
-  "engines": {
-    "node": ">=22"
-  },
   "scripts": {
     "format": "prettier --write .",
     "format:check": "bash -n hooks/*.sh && prettier --check ."

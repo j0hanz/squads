@@ -10,7 +10,7 @@ argument-hint: '[feature or behavior to implement]'
 
 ## When NOT to use TDD
 
-Escape hatch from the HARD GATE. Never self-invoke silently: match the request to a category below, then confirm via `AskUserQuestion`. Autonomous invocation (no user to ask): no escape hatch — full TDD, unless the approved task's `Action:` text says pure UI/CSS; then skip TDD and state the reason in the [structured return](../dispatch-agents/SKILL.md#handoff-contract). Zero-logic boilerplate gets no auto escape hatch. Doubt? Write the test.
+Escape hatch from the HARD GATE. Never self-invoke silently: match the request to a category below, then confirm via `AskUserQuestion`. Autonomous invocation (no user to ask): no escape hatch — full TDD, unless the approved task's `Action:` text says pure UI/CSS; then skip TDD and state the reason in the [structured return](../squads/SKILL.md#handoff-contract). Zero-logic boilerplate gets no auto escape hatch. Doubt? Write the test.
 
 **Escape-hatch categories:**
 

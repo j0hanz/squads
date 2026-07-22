@@ -30,7 +30,7 @@ Single-thread only when the stack trace's top frame IS the root-cause line (wher
 
 ## Invariants — apply to every dispatch
 
-All [dispatch-agents invariants](../dispatch-agents/SKILL.md#invariants--apply-to-every-dispatch) apply exactly (bare-claim to skeptics, judge ≠ generator — both defined there). Debug adds:
+All [dispatch-agents invariants](../squads/SKILL.md#invariants--apply-to-every-dispatch) apply exactly (bare-claim to skeptics, judge ≠ generator — both defined there). Debug adds:
 
 - **No fake investigators or skeptics.** Main thread never authors investigator findings nor grades hypotheses it generated or read — investigation is hypothesis, not finding.
 - **Bare-claim format (debug-specific shape of the canonical bare-claim rule):** a hypothesis reaches skeptics as a one-line claim — `root cause is <X> at <file:line>, classified as <logic|design-level>` — no reasoning, no proof walk, no caller-graph findings. Skeptics re-derive proof from repro and exact output alone.

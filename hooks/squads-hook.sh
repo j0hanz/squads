@@ -71,7 +71,7 @@ session_start() {
 # Deny a dispatch whose body carries an unresolved {{...}} placeholder. Fail-closed
 # without jq (hygiene unverifiable = blocked, not shipped, with hint).
 dispatch_check() {
-  command -v jq >/dev/null 2>&1 || deny dispatch-check "jq not found — guard cannot run. Install jq (Windows: winget install jqlang.jq; macOS: brew install jq; Linux: apt/dnf install jq) and retry. Blocked."
+  command -v jq >/dev/null 2>&1 || deny dispatch-check "jq not found — guard cannot run. Install jq and retry. Blocked."
   local body placeholders
   # The dispatch body is a concatenation of all the fields that can carry placeholders. If any field is missing, it is treated as empty. The jq command extracts these fields and joins them with newlines.
   body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", .tool_input.summary // "", .tool_input.to // "", .tool_input.scriptPath // "", .tool_input.name // "", (.tool_input.args // "" | tostring)] | join("\n")' 2>/dev/null) ||
@@ -87,9 +87,9 @@ dispatch_check() {
     !skip
     END { if (skip || bad) exit 3 }
   ' <<<"$body") ||
-    deny dispatch-check "misordered or unclosed <untrusted_context> block — each must open before it closes and be closed; wrap braces as data inside a balanced block."
+    deny dispatch-check "misordered/unclosed <untrusted_context> block — open before close, and close it; wrap braces as data inside."
   placeholders=$(grep -oE '\{\{[^{}]*\}\}' <<<"$body" | sort -u | paste -sd, -)
-  [[ -z "$placeholders" ]] || deny dispatch-check "dispatch body contains unresolved placeholder(s) $placeholders — replace every {{...}} with real values before dispatching (wrap third-party content in <untrusted_context> if the braces are data)."
+  [[ -z "$placeholders" ]] || deny dispatch-check "unresolved placeholder(s) $placeholders — replace every {{...}} with real values. Wrap third-party data in <untrusted_context>."
   exit 0
 }
 
@@ -115,7 +115,7 @@ debug_gate() { # debug_gate <tool> <sid> <file_path>
     return 0
   fi
   is_exempt_path "$(basename "${file_path//\\//}")" ||
-    deny debug-gate "debug is active — its HARD GATE forbids code edits before the root cause is reproduced and routed to tdd (logic bug) or plan (design-level); review also lifts. If debugging was abandoned, remove $flag."
+    deny debug-gate "debug active — code edits blocked. Reproduce root cause, then route: tdd (logic bug) or plan (design). review also lifts. Abandoned? remove $flag"
 }
 
 # Shared plan-schema validator: file content on stdin, first violation text on
@@ -126,7 +126,7 @@ plan_schema_violations() {
   local content missing
   content=$(cat)
   grep -qE '^Origin:[[:space:]]*\S' <<<"$content" || {
-    printf "plan missing an 'Origin:' header (e.g. 'Origin: plan' or 'Origin: human').\n"
+    printf "missing 'Origin:' header (e.g. 'Origin: plan').\n"
     return 0
   }
   # Every ### TASK-NNN: block must carry all 7 Canonical Task Block field labels.
@@ -139,7 +139,7 @@ plan_schema_violations() {
     function emit() { m=""; for (w in want) if (!(w in seen)) m=m (m==""?"":", ") w; if (m != "") printf "%s missing: %s\n", id, m }
   ' <<<"$content")
   [[ -z "$missing" ]] ||
-    printf 'plan has TASK block(s) missing Canonical Task Block field(s) — %s: each ### TASK-NNN: block needs all 7 (Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result).\n' "$(printf '%s' "$missing" | tr '\n' '; ')"
+    printf 'TASK block(s) missing fields — %s. Each ### TASK-NNN: block needs all 7: Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result.\n' "$(printf '%s' "$missing" | tr '\n' '; ')"
 }
 
 # Canonical Task Block guard on Write to a docs/plan/*.plan.md. Write-only: Edit's

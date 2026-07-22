@@ -11,11 +11,13 @@
 #   pre-tool        PreToolUse Write|Edit|MultiEdit|NotebookEdit — debug-gate
 #                   (debug HARD GATE), then plan-schema (Write to a
 #                   docs/plan/*.plan.md): 7 required fields, Files: max 3 paths
-#   post-tool       PostToolUse Skill|Agent|Write|Edit|MultiEdit|NotebookEdit —
-#                   arm/lift the debug flag on Skill, shape-check an Agent return
-#                   against the Handoff Contract, and re-check plan-schema on a
-#                   docs/plan/*.plan.md. All feedback-only (exit 2 + stderr on
-#                   violation, silent exit 0 otherwise)
+#   post-tool       PostToolUse Skill|Write|Edit|MultiEdit|NotebookEdit —
+#                   arm/lift the debug flag on Skill, and re-check plan-schema
+#                   on a docs/plan/*.plan.md. All feedback-only (exit 2 + stderr
+#                   on violation, silent exit 0 otherwise). Agent returns are
+#                   NOT shape-checked here: the Handoff Contract is prompt-
+#                   enforced (skills/squads/SKILL.md:43), and a PostToolUse deny
+#                   can't tell squads dispatches from ad-hoc Agent calls.
 #
 # `set -uo pipefail` WITHOUT `-e` is intentional: grep/find return non-zero
 # legitimately and must not abort the hook. Do not add `-e`.
@@ -236,20 +238,6 @@ post_tool() {
         squads:debug) touch "$(state_dir)/squads-debug-gate-${sid:-unknown}" ;;
         squads:tdd | squads:plan | squads:review) rm -f "$(state_dir)/squads-debug-gate-${sid:-unknown}" ;;
       esac
-      exit 0
-      ;;
-    Agent)
-      # Check if tool_response is a JSON object with required Handoff Contract keys
-      if ! jq -e '(.tool_response | type) == "object"' <<<"$input" >/dev/null 2>&1; then
-        exit 0
-      fi
-      # Check for required keys: status and findings
-      local missing_keys=()
-      jq -e '.tool_response | has("status")' <<<"$input" >/dev/null 2>&1 || missing_keys+=("status")
-      jq -e '.tool_response | has("findings")' <<<"$input" >/dev/null 2>&1 || missing_keys+=("findings")
-      if [[ ${#missing_keys[@]} -gt 0 ]]; then
-        deny handoff "return missing $(IFS=', '; printf '%s' "${missing_keys[*]}") — discard and retry once per skills/squads/SKILL.md:43."
-      fi
       exit 0
       ;;
     Write | Edit | MultiEdit | NotebookEdit) ;;

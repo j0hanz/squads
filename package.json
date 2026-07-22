@@ -28,7 +28,7 @@
   "private": true,
   "scripts": {
     "format": "prettier --write .",
-    "format:check": "bash -n hooks/*.sh && prettier --check ."
+    "format:check": "bash -n hooks/*.sh scripts/*.sh && prettier --check ."
   },
   "devDependencies": {
     "prettier": "^3.8.4"

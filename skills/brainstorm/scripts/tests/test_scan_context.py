@@ -428,3 +428,87 @@ def test_analog_rank_deterministic_across_seeds(tmp_path):
         f"  seed=0: {out0.stdout.strip()}\n"
         f"  seed=1: {out1.stdout.strip()}"
     )
+
+
+# --- TASK-012: ScanResult.truncated field tracks what was dropped ---
+
+
+@_GIT_REQUIRED
+def test_truncated_reports_overflow_and_under_cap(tmp_path):
+    """A scan that overflows a cap reports kept/total; under-cap scans omit the entry."""
+    _init_git_repo(tmp_path)
+    (tmp_path / "src").mkdir()
+
+    # Create 10 files matching "search" so related_files cap (5) will overflow
+    for i in range(10):
+        (tmp_path / "src" / f"module_{i:02d}.py").write_text(
+            "search = 1\n", encoding="utf-8"
+        )
+
+    # Create enough synonyms-only files to trigger analogous_features cap (2)
+    for i in range(5):
+        (tmp_path / "src" / f"query_{i:02d}.py").write_text(
+            "query = 1\n", encoding="utf-8"
+        )
+
+    # Create multiple files with constraints to exceed the global cap (5)
+    # Each file can have up to 3 constraints (per _MAX_CONSTRAINTS_PER_FILE).
+    # With 5 matched files, we could collect 15 constraints, then dedupe and cap at 5.
+    for i in range(5):
+        constraints_content = "search = 1\n" + "\n".join(
+            f"# TODO constraint {i}_{j}" for j in range(5)
+        )
+        (tmp_path / "src" / f"constraints_{i:02d}.py").write_text(
+            constraints_content, encoding="utf-8"
+        )
+
+    _git_commit_all(tmp_path)
+    result = sc.scan(["search"], tmp_path)
+
+    # related_files cap is 5; we have 15 matching files → should be truncated
+    assert len(result.related_files) == 5
+    assert "related_files" in result.truncated
+    assert result.truncated["related_files"] == "5/15"
+
+    # analogous_features cap is 2; we have 5 synonym-only files → should be truncated
+    assert len(result.analogous_features) <= 2
+    assert "analogous_features" in result.truncated
+    kept_analog = len(result.analogous_features)
+    assert result.truncated["analogous_features"] == f"{kept_analog}/5"
+
+    # constraints: each file can have 3 (per-file limit), 5 matched files = up to 15.
+    # After dedup, if we still have > 5, they'll be capped at 5.
+    assert len(result.constraints) == 5
+    assert "constraints" in result.truncated
+    # Before capping, we had at least 5 (and up to 15 from 5 files * 3 per file)
+    kept_constraints = len(result.constraints)
+    assert result.truncated["constraints"].split("/")[0] == str(kept_constraints)
+
+
+@_GIT_REQUIRED
+def test_truncated_omits_under_cap_fields(tmp_path):
+    """A scan under all caps omits truncated entries for those fields."""
+    _init_git_repo(tmp_path)
+    (tmp_path / "src").mkdir()
+
+    # Create just 2 matching files (under related_files cap of 5)
+    (tmp_path / "src" / "foo.py").write_text("search = 1\n", encoding="utf-8")
+    (tmp_path / "src" / "bar.py").write_text("search = 2\n", encoding="utf-8")
+
+    # No synonyms-only files → no overflow of analogous_features cap (2)
+    # Minimal shapes → no overflow of interface_shapes cap (10)
+    # Minimal constraints → no overflow of constraints cap (5)
+    # Minimal unknowns → no overflow of unknowns cap (4)
+
+    _git_commit_all(tmp_path)
+    result = sc.scan(["search"], tmp_path)
+
+    # All fields should be under their caps
+    assert len(result.related_files) <= 5
+    assert len(result.analogous_features) <= 2
+    assert len(result.interface_shapes) <= 10
+    assert len(result.constraints) <= 5
+    assert len(result.unknowns) <= 4
+
+    # truncated dict should be empty (no field overflowed)
+    assert result.truncated == {}

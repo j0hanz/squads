@@ -24,41 +24,21 @@ Native dynamic workflows are a hard dependency for composed mode. Check per [for
 | -------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | Preflight fails (see §Preflight above)                                                 | composed OFF; inline only                             |
 | Explicit "make/build a workflow"                                                       | composed                                              |
-| Lifecycle match (per <squads-router>)                                                  | inline                                                |
 | Bulk: recurring (any size) → composed/forge; one-off ≥ cutoff (currently 5) → composed | composed                                              |
 | Bulk: one-off < cutoff (currently 5) → inline fleet                                    | inline                                                |
-| Trivial: single file · one edit · typo · ≤ 1 item                                      | inline                                                |
 | Doubt                                                                                  | inline (escalation seam recovers under-orchestration) |
 | Class default                                                                          | read-only; fetch/edit only on demand + approval       |
 
-Threshold Table picks mode FIRST. The fleet-shape list below applies only when mode = inline; recurring bulk and one-off bulk ≥ the cutoff go composed; one-off bulk below the cutoff routes inline — all stated, never silent.
-
-### INLINE branch — fleet shapes
-
-Mode is inline; the `<squads-router>` block picks the destination. This is the fleet shape once it is picked.
-
-- **brainstorm** — None in ideation (Phases 1–4, 6); Phase 5 dispatches 3 persona critics (haiku, read-only)
-- **plan** — Sized by [plan §Fan-out Scaling](../plan/SKILL.md#fan-out-scaling) — lens × slice ideators (sketch 0), chunked critics — sketch skips validate, routes direct to [tdd](../tdd/SKILL.md) (single logic behavior) or main thread (trivial edits) per plan Step 5
-- **approved plan in hand** — Executing an approved plan (below); workers sized by the `Depends on:` / `Files:` task graph; single focused task → [tdd](../tdd/SKILL.md)
-- **tdd** — One worker; review supplies fresh eyes
-- **debug** — One investigator per hypothesis + fresh skeptics
-- **review** — Request: 2 fresh read-only reviewers, distinct lenses, union findings. Resolve: main thread verifies findings; re-review capped at 2
-- **forge-workflow** — Fan out — one agent per chunk, cap ~10
-
-Two rows fit? Earlier wins by lifecycle: ideation before planning, planning before execution; failure reproduced (debug) before fix (tdd) regardless of row order. One-shot edits and simple questions need no workflow/fleet — answer direct, stop. Doubt on fleet size → go smaller; every fan-out multiplies token cost.
+Threshold Table picks mode FIRST; the decisions above describe all work that runs here — recurring bulk and one-off bulk ≥ the cutoff go composed; one-off bulk below the cutoff routes inline — all stated, never silent.
 
 ### Governor output struct
 
-Governor emits `{mode, route, shape, class, budget_tokens, agent_cap, reason}`:
+Governor emits `{mode, class, reason}`:
 
 ```
-mode:          inline | composed
-route:         <lifecycle skill>          # mode=inline
-shape:         [<Pattern-Canon stage>, …] # mode=composed
-class:         read-only | fetch | edit   # Governor-set, final; edit/fetch need approval
-budget_tokens: <int>                       # Governor-set, final
-agent_cap:     <int>                        # Governor-set, final
-reason:        <one-line decision log, shown to user>
+mode:   inline | composed
+class:  read-only | fetch | edit   # Governor-set, final; edit/fetch need approval
+reason: <one-line decision log, shown to user>
 ```
 
 ### Composition Spec (dispatch-agents → forge-workflow)
@@ -66,10 +46,10 @@ reason:        <one-line decision log, shown to user>
 When mode = composed, Governor writes a Composition Spec; forge generates, audits, runs, and catalogs the pattern stack.
 
 ```
-stages:           [{ pattern, args }]   # ordered Pattern-Canon stack; model per #model--fan-out-policy
-class:            <from Governor>
-budget_tokens:    <from Governor>
-agent_cap:        <from Governor>
+stages:           [{ pattern, args }]      # ordered Pattern-Canon stack; model per #model--fan-out-policy
+class:            read-only | fetch | edit # Governor-determined, guidance only
+budget_tokens:    <int>                     # Governor-determined, guidance only
+agent_cap:        <int>                     # Governor-determined, guidance only
 success_criteria: <rubric / stop condition, written before dispatch>
 ```
 
@@ -128,7 +108,7 @@ Update task status only on state transition (pending→in_progress at start, in_
 
 **Skip the verify workflow when the changeset is confined to hook scripts AND an existing self-check/suite already covers the changed branch** — suite = verification.
 
-**Granularity rule:** worker tasks must be haiku-sized (bounded files, one behavior, runnable `Validate:`). Oversized tasks were plan's job to decompose — refuse them back to plan, never hand a big job to one agent.
+**Granularity rule:** worker tasks must be haiku-sized (at most 3 files in `Files:`, one behavior, runnable `Validate:`). Oversized tasks were plan's job to decompose — refuse them back to plan, never hand a big job to one agent. The ceiling is enforced by the `plan-schema` hook in `squads-hook.sh`, which denies a Write if any `### TASK-NNN:` block lists more than 3 paths in `Files:`.
 
 ## Long-running builds
 

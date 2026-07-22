@@ -25,7 +25,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) and `jq` on PATH (`dispatch-check` fails closed without it, the edit-path gates fail open — Windows: `winget install jqlang.jq`; macOS: `brew install jq`; Linux: `apt/dnf install jq`). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json`, 10s PreToolUse timeout). Note: a command-hook timeout is a non-blocking error (fail-OPEN) and is unfixable, only mitigated.
+> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). Install `jq` on PATH for placeholder, debug-gate, and plan-schema validation (recommended but not required — all gates fail OPEN with a `[WARN]` on stderr without it; Windows: `winget install jqlang.jq`; macOS: `brew install jq`; Linux: `apt/dnf install jq`). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json` running bare bash by default, `SQUADS_PERF=1` opts into the Python perf wrapper, 10s PreToolUse timeout).
 
 ## Usage
 

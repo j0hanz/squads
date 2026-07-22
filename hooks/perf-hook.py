@@ -24,10 +24,10 @@ Record shape (fields omitted when absent; exit omitted when 0):
 exit 2 + the "squads <gate>:" err prefix names the guard that fired
 (debug-gate, dispatch-check, plan-schema); post-tool exit 2
 with no prefix is plan-schema feedback, not a deny. "timeout":1 marks a rule
-killed at CHILD_TIMEOUT. dispatch-check fails CLOSED on that timeout (exit 2,
-matching its jq-missing / bad-payload posture); every other rule fails open.
-Only Claude Code's own outer kill (10s, which the wrapper cannot intercept)
-stays an unfixable fail-open — the R2 residual hooks.json documents.
+killed at CHILD_TIMEOUT. Every rule fails open on timeout, emitting a [WARN]
+line to stderr naming the guard that did not run. Only Claude Code's own outer
+kill (10s, which the wrapper cannot intercept) stays an unfixable fail-open —
+the R2 residual hooks.json documents.
 """
 
 import json
@@ -46,6 +46,7 @@ ERR_MAX = 160
 # 8s < the 10s pre/post/dispatch entries, 4s < the 5s session-start entry.
 CHILD_TIMEOUT = 8
 SESSION_START_TIMEOUT = 4
+SELF_CHECK_TIMEOUT = 1
 GATES = ("debug-gate", "dispatch-check", "plan-schema")
 
 
@@ -81,14 +82,15 @@ def find_bash() -> str:
 
 
 def run_rule(
-    rule: str, payload: bytes, script: Path | None = None
+    rule: str, payload: bytes, script: Path | None = None, timeout: int | None = None
 ) -> dict[str, Any]:
     """Run squads-hook.sh <rule> with the payload on stdin, wall-clocked."""
     script = script or Path(__file__).with_name("squads-hook.sh")
     cmd = [find_bash(), str(script).replace("\\", "/"), rule]
-    timeout = (
-        SESSION_START_TIMEOUT if rule == "session-start" else CHILD_TIMEOUT
-    )
+    if timeout is None:
+        timeout = (
+            SESSION_START_TIMEOUT if rule == "session-start" else CHILD_TIMEOUT
+        )
     t0 = time.perf_counter()
     try:
         proc = subprocess.run(
@@ -101,11 +103,11 @@ def run_rule(
             False,
         )
     except subprocess.TimeoutExpired:
-        # dispatch-check is the only fail-CLOSED guard; every other rule fails open on a wrapper timeout.
+        # Every rule fails open on timeout, announcing to stderr which gate was not applied.
         out, err, code, timed_out = (
             b"",
-            b"" if rule != "dispatch-check" else b"squads dispatch-check: guard timed out -- dispatch blocked. Retry.\n",
-            2 if rule == "dispatch-check" else 0,
+            f"[WARN] squads {rule}: guard timed out after {timeout}s, gate not applied.\n".encode(),
+            0,
             True,
         )
     ms = max(0, round((time.perf_counter() - t0) * 1000))
@@ -170,7 +172,7 @@ def append_line(path: Path, line: str) -> bool:
 def main(rule: str) -> int:
     payload_raw = sys.stdin.buffer.read()
     result = run_rule(rule, payload_raw)
-    with suppress(Exception):  # logging must never affect the passthrough
+    try:
         try:
             payload = json.loads(
                 payload_raw.decode("utf-8", "replace") or "{}"
@@ -186,105 +188,13 @@ def main(rule: str) -> int:
             directory / f"{now:%Y-%m-%d}.jsonl",
             to_line(build_record(rule, payload, result, now)) + "\n",
         )
+    except Exception:
+        sys.stderr.buffer.write(
+            b"[DEBUG] perf-hook logging failed; passthrough unaffected.\n"
+        )
     sys.stdout.buffer.write(result["out"])
     sys.stderr.buffer.write(result["err"])
     return result["code"]
-
-
-# ---------- report ----------
-
-
-def gate_of(record: dict[str, Any]) -> str:
-    """Which guard produced this exit-2 record: gate name, 'feedback'
-    (post-tool plan-schema), 'other', or '' when the fire passed clean."""
-    if record.get("exit") != 2:
-        return ""
-    err = record.get("err", "")
-    for gate in GATES:
-        if isinstance(err, str) and err.startswith(f"squads {gate}:"):
-            return gate
-    return "feedback" if record.get("rule") == "post-tool" else "other"
-
-
-def pct(values: list, p: int) -> int:
-    """Nearest-rank percentile; 0 on empty."""
-    ordered = sorted(values)
-    return (
-        ordered[max(0, (p * len(ordered) + 99) // 100 - 1)] if ordered else 0
-    )
-
-
-def load_records(directory: Path) -> list[dict[str, Any]]:
-    records = []
-    for file in sorted(directory.glob("*.jsonl")):
-        for raw in file.read_text(encoding="utf-8").splitlines():
-            with suppress(json.JSONDecodeError):
-                record = json.loads(raw)
-                if isinstance(record, dict):
-                    record["day"] = file.stem
-                    records.append(record)
-    return records
-
-
-def durations(rows: list[dict[str, Any]]) -> list:
-    return [r["ms"] for r in rows if isinstance(r.get("ms"), (int, float))]
-
-
-def report() -> None:
-    directory = log_dir()
-    records = load_records(directory) if directory.is_dir() else []
-    if not records:
-        print(f"no perf records in {directory}")
-        return
-    days = sorted({r["day"] for r in records})
-    span = days[0] if len(days) == 1 else f"{days[0]}..{days[-1]}"
-    deny_total = sum(1 for r in records if gate_of(r) not in ("", "feedback"))
-    feedback = sum(1 for r in records if gate_of(r) == "feedback")
-    timeouts = sum(1 for r in records if r.get("timeout"))
-    print(
-        f"squads perf - {span} | {len(records)} fires | {deny_total} denies"
-        f" | {feedback} feedback | {timeouts} timeouts"
-    )
-    print()
-    print(f"{'rule':<15}{'fires':>6}{'p50':>8}{'p95':>8}{'max':>8}{'deny':>6}")
-    by_rule: dict[str, list] = {}
-    for r in records:
-        by_rule.setdefault(str(r.get("rule", "?")), []).append(r)
-    for rule, rows in sorted(by_rule.items(), key=lambda kv: -len(kv[1])):
-        ms = durations(rows)
-        deny = sum(1 for r in rows if gate_of(r) not in ("", "feedback"))
-        print(
-            f"{rule:<15}{len(rows):>6}{pct(ms, 50):>6}ms{pct(ms, 95):>6}ms"
-            f"{max(ms, default=0):>6}ms{deny:>6}"
-        )
-    gate_counts: dict[str, int] = {}
-    for r in records:
-        if gate := gate_of(r):
-            gate_counts[gate] = gate_counts.get(gate, 0) + 1
-    if gate_counts:
-        print()
-        print(
-            "gates: "
-            + " | ".join(
-                f"{g} {n}"
-                for g, n in sorted(gate_counts.items(), key=lambda kv: -kv[1])
-            )
-        )
-    print()
-    print("sessions")
-    sessions: dict[str, list] = {}
-    for r in records:
-        sessions.setdefault(str(r.get("session", "-")), []).append(r)
-    shown = list(sessions.items())[-10:]
-    for sid, rows in shown:
-        ms = durations(rows)
-        deny = sum(1 for r in rows if gate_of(r) not in ("", "feedback"))
-        print(
-            f"{sid:<10}{rows[0]['day']}  {len(rows):>4} fires  {deny:>3} deny"
-            f"  p50 {pct(ms, 50)}ms  p95 {pct(ms, 95)}ms"
-        )
-    if len(sessions) > len(shown):
-        print(f"({len(sessions) - len(shown)} older sessions not shown)")
 
 
 # ---------- self-check ----------
@@ -322,16 +232,8 @@ def self_check() -> None:
         "session": "abcdef12",
         "err": "squads debug-gate: debug is active",
     }, denied
-    assert gate_of(denied) == "debug-gate"
-    assert (
-        gate_of({"exit": 2, "rule": "post-tool", "err": "plan missing"})
-        == "feedback"
-    )
-    assert gate_of({"rule": "pre-tool", "ms": 5}) == ""
     assert to_line(bare) == '{"ts":"14:03:22","rule":"session-start","ms":41}'
     assert to_line({"err": "naïve"}) == '{"err":"naïve"}'
-    assert pct([3, 1, 2], 50) == 2 and pct(list(range(1, 101)), 95) == 95
-    assert pct([], 50) == 0
 
     with tempfile.TemporaryDirectory() as td:
         path = Path(td) / "t.jsonl"
@@ -357,11 +259,22 @@ def self_check() -> None:
     ).encode()
     r = run_rule("dispatch-check", dirty)
     assert r["code"] == 2 and b"unresolved placeholder" in r["err"], r
-    clean = json.dumps(
+    # model field handling: haiku is silent, others warn, absent warns
+    with_haiku = json.dumps(
+        {"tool_name": "Agent", "tool_input": {"prompt": "do it", "model": "haiku"}}
+    ).encode()
+    r = run_rule("dispatch-check", with_haiku)
+    assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
+    with_opus = json.dumps(
+        {"tool_name": "Agent", "tool_input": {"prompt": "do it", "model": "opus"}}
+    ).encode()
+    r = run_rule("dispatch-check", with_opus)
+    assert r["code"] == 0 and b"is not haiku" in r["err"], r
+    no_model = json.dumps(
         {"tool_name": "Agent", "tool_input": {"prompt": "do it"}}
     ).encode()
-    r = run_rule("dispatch-check", clean)
-    assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
+    r = run_rule("dispatch-check", no_model)
+    assert r["code"] == 0 and b"model param unavailable" in r["err"], r
 
     # --- pre-tool path assertions (TASK-005) ---
     # Flag files live in the hook's bash state_dir (${TMPDIR:-/tmp}). On
@@ -529,7 +442,6 @@ def self_check() -> None:
     assert b"debug-gate ACTIVE" in r["out"], r
 
     # record a plan path via a plan-path Write post-tool → recap names it
-    import os as _os
     td_plan = _bash(f'mktemp -d "{_state_expr}/squadsplan.XXXXXX"').strip()
     plan_path = f"{td_plan.decode()}/docs/plan/x.plan.md"
     _bash(f'mkdir -p "{td_plan.decode()}/docs/plan" && printf "Origin: plan\\n" > "{plan_path}"')
@@ -621,13 +533,14 @@ def self_check() -> None:
     _clean(sid)
 
     # (6) dispatch-check untrusted_context: a balanced block hides its {{...}}
-    # from the linter; a close-before-open block fails closed.
+    # from the linter; a close-before-open block now fails open with [WARN].
     balanced = json.dumps(
         {
             "tool_name": "Agent",
             "tool_input": {
                 "prompt": "analyze:\n<untrusted_context>\n"
-                "user: {{foo}}\n</untrusted_context>\ndone"
+                "user: {{foo}}\n</untrusted_context>\ndone",
+                "model": "haiku"
             },
         }
     ).encode()
@@ -637,12 +550,13 @@ def self_check() -> None:
         {
             "tool_name": "Agent",
             "tool_input": {
-                "prompt": "</untrusted_context>\n{{x}}\n<untrusted_context>"
+                "prompt": "</untrusted_context>\n{{x}}\n<untrusted_context>",
+                "model": "haiku"
             },
         }
     ).encode()
     r = run_rule("dispatch-check", misordered)
-    assert r["code"] == 2 and b"untrusted_context" in r["err"], r
+    assert r["code"] == 0 and b"untrusted_context" in r["err"], r
 
     # (7) dispatch-check lints SendMessage to/summary and Workflow scriptPath/name
     # — a {{...}} in any of those metadata fields is caught, not just in prompt.
@@ -653,17 +567,16 @@ def self_check() -> None:
         r = run_rule("dispatch-check", dirty_meta)
         assert r["code"] == 2 and b"unresolved placeholder" in r["err"], (field, r)
 
-    # (8) dispatch-check fails CLOSED on a child timeout (exit 2 + named err);
-    # every other rule still fails open (unchanged, not asserted here). Stub
-    # sleeps past the 8s CHILD_TIMEOUT; costs 8s wall-clock, run once.
+    # (8) dispatch-check fails open on a child timeout (exit 0 + [WARN] err);
+    # every rule fails open. Stub sleeps past SELF_CHECK_TIMEOUT; quick assertion.
     with tempfile.TemporaryDirectory() as td:
         slow = Path(td) / "slow.sh"
-        slow.write_text("sleep 10\n", encoding="utf-8")
-        r = run_rule("dispatch-check", b"{}", script=slow)
+        slow.write_text("sleep 2\n", encoding="utf-8")
+        r = run_rule("dispatch-check", b"{}", script=slow, timeout=SELF_CHECK_TIMEOUT)
         assert (
-            r["code"] == 2
+            r["code"] == 0
             and r["timeout"]
-            and r["err"].startswith(b"squads dispatch-check:")
+            and r["err"].startswith(b"[WARN] squads dispatch-check:")
         ), r
 
     print("self-check OK")
@@ -673,23 +586,15 @@ if __name__ == "__main__":
     argv = sys.argv[1:]
     if argv == ["--self-check"]:
         self_check()  # assertion failures stay loud on purpose
-    elif argv == ["report"]:
-        report()
     else:
         rule = argv[0] if argv else ""
         try:
             code = main(rule)
         except Exception:
-            # Fail-open by default so a wrapper bug never wedges a session.
-            # dispatch-check is the one fail-CLOSED guard (§5.1): a crash there
-            # must still block, matching the jq-missing / bad-payload denies in
-            # the dispatcher, or a placeholder could ship on a wrapper fault.
-            if rule == "dispatch-check":
-                sys.stderr.write(
-                    "squads dispatch-check: guard wrapper failed — dispatch "
-                    "blocked. Retry; if it persists, check python/bash/jq.\n"
-                )
-                code = 2
-            else:
-                code = 0
+            # Fail-open: every rule announces to stderr when it does not run,
+            # whether due to timeout or wrapper crash.
+            sys.stderr.write(
+                f"[WARN] squads {rule}: guard wrapper failed, gate not applied.\n"
+            )
+            code = 0
         sys.exit(code)

@@ -46,6 +46,7 @@ class ScanResult:
     scope: str = "M"
     scope_reasoning: str = ""
     unknowns: list[str] = field(default_factory=list)
+    truncated: dict[str, str] = field(default_factory=dict)
 
 
 # Directories that are never useful to scan
@@ -769,12 +770,19 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     }
 
     # Cap to _MAX_FILES most relevant files
+    before_files = len(result.related_files)
     result.related_files = result.related_files[
         :_MAX_FILES
     ]  # keep the highest-ranked files
+    after_files = len(result.related_files)
+    if before_files > after_files:
+        result.truncated["related_files"] = f"{after_files}/{before_files}"
 
     # Record analogous features (files found only via adjacent synonyms)
+    before_analog = len(adjacent_paths)
     result.analogous_features = sorted(adjacent_paths)[:_MAX_ANALOGOUS]
+    if before_analog > _MAX_ANALOGOUS:
+        result.truncated["analogous_features"] = f"{_MAX_ANALOGOUS}/{before_analog}"
 
     # ── Phase 2: parallel git log + constraints + shapes+imports + tests ───────
     # shape+import futures run over matched files (≤5) PLUS adjacent files (≤2)
@@ -877,7 +885,10 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             c,
         ),
     )
+    before_analog_rerank = len(ranked)
     result.analogous_features = ranked[:_MAX_ANALOGOUS]
+    if before_analog_rerank > _MAX_ANALOGOUS:
+        result.truncated["analogous_features"] = f"{_MAX_ANALOGOUS}/{before_analog_rerank}"
 
     # ── Scope signal ─────────────────────────────────────────────────────────
     crosses_boundary = len(matched_modules) > 1
@@ -903,14 +914,30 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     # ── Compress: dedupe + cap low-signal fields for Phase 3 ideation ──────────
     for f in result.related_files:
         f.last_commit = _truncate_git_log(f.last_commit, _MAX_LOG_LINES)
-    result.interface_shapes = _dedupe_stable(result.interface_shapes)[
-        :_MAX_INTERFACE_SHAPES
-    ]
-    result.constraints = _dedupe_stable(result.constraints)[:_MAX_CONSTRAINTS]
-    result.unknowns = _dedupe_stable(result.unknowns)[:_MAX_UNKNOWNS]
-    result.analogous_features = _dedupe_stable(result.analogous_features)[
-        :_MAX_ANALOGOUS
-    ]
+
+    interface_deduped = _dedupe_stable(result.interface_shapes)
+    before_shapes = len(interface_deduped)
+    result.interface_shapes = interface_deduped[:_MAX_INTERFACE_SHAPES]
+    if before_shapes > len(result.interface_shapes):
+        result.truncated["interface_shapes"] = f"{len(result.interface_shapes)}/{before_shapes}"
+
+    constraints_deduped = _dedupe_stable(result.constraints)
+    before_constraints = len(constraints_deduped)
+    result.constraints = constraints_deduped[:_MAX_CONSTRAINTS]
+    if before_constraints > len(result.constraints):
+        result.truncated["constraints"] = f"{len(result.constraints)}/{before_constraints}"
+
+    unknowns_deduped = _dedupe_stable(result.unknowns)
+    before_unknowns = len(unknowns_deduped)
+    result.unknowns = unknowns_deduped[:_MAX_UNKNOWNS]
+    if before_unknowns > len(result.unknowns):
+        result.truncated["unknowns"] = f"{len(result.unknowns)}/{before_unknowns}"
+
+    analogous_deduped = _dedupe_stable(result.analogous_features)
+    before_analog_final = len(analogous_deduped)
+    result.analogous_features = analogous_deduped[:_MAX_ANALOGOUS]
+    if before_analog_final > len(result.analogous_features):
+        result.truncated["analogous_features"] = f"{len(result.analogous_features)}/{before_analog_final}"
     result.scope_reasoning = _trim_str(result.scope_reasoning, 150)
 
     return result

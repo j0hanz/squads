@@ -5,13 +5,16 @@
 # Rules:
 #   session-start   SessionStart                          — inject the squads router
 #   dispatch-check  PreToolUse Agent|SendMessage|Workflow — deny unresolved {{...}}
-#                   placeholders in dispatch bodies (a clean dispatch is silent by
-#                   design: nothing on a clean pass, deny on stderr exit 2)
+#                   placeholders in dispatch bodies, and WARN (never deny) when an
+#                   Agent dispatch is not model haiku. Fails OPEN on any
+#                   infrastructure failure; a clean dispatch is silent by design
 #   pre-tool        PreToolUse Write|Edit|MultiEdit|NotebookEdit — debug-gate
 #                   (debug HARD GATE), then plan-schema (Write to a
-#                   docs/plan/*.plan.md)
-#   post-tool       PostToolUse Write|Edit|MultiEdit|NotebookEdit — plan-schema
-#                   feedback-only on docs/plan/*.plan.md (exit 2 + stderr on
+#                   docs/plan/*.plan.md): 7 required fields, Files: max 3 paths
+#   post-tool       PostToolUse Skill|Agent|Write|Edit|MultiEdit|NotebookEdit —
+#                   arm/lift the debug flag on Skill, shape-check an Agent return
+#                   against the Handoff Contract, and re-check plan-schema on a
+#                   docs/plan/*.plan.md. All feedback-only (exit 2 + stderr on
 #                   violation, silent exit 0 otherwise)
 #
 # `set -uo pipefail` WITHOUT `-e` is intentional: grep/find return non-zero
@@ -55,7 +58,7 @@ session_start() {
   # Reap stale per-session state from crashed sessions (120-min horizon, flat dir).
   find "$(state_dir)" -maxdepth 1 -name 'squads-*' -mmin +120 -exec rm -f {} + 2>/dev/null || true
   if ! command -v jq >/dev/null 2>&1; then
-    echo 'squads: jq not found — dispatch-check will DENY dispatches this session. Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.' >&2
+    echo 'squads: jq not found — every gate fails OPEN this session (placeholder, debug-gate and plan-schema checks are skipped, each with a warning). Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.' >&2
   fi
   # On compaction the model was already routed this session; emit a one-line
   # refresher that preserves every routing decision without the banner/tags.
@@ -82,14 +85,32 @@ session_start() {
 
 # ---------- dispatch-check ----------
 
-# Deny a dispatch whose body carries an unresolved {{...}} placeholder. Fail-closed
-# without jq (hygiene unverifiable = blocked, not shipped, with hint).
+# Deny a dispatch whose body carries an unresolved {{...}} placeholder. Fails OPEN
+# on every infrastructure failure (no jq, bad payload, malformed wrap): a blocked
+# dispatch costs the whole fleet, a leaked placeholder costs one subagent. The
+# positive placeholder match is the only deny left.
 dispatch_check() {
-  command -v jq >/dev/null 2>&1 || deny dispatch-check "jq not found — guard cannot run. Install jq and retry. Blocked."
-  local body placeholders
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "[WARN] squads dispatch-check: jq not found — placeholder hygiene unverified, dispatch allowed. Install jq." >&2
+    exit 0
+  fi
+  local input body placeholders tool model
+  # One stdin read; jq is called more than once below, and stdin is not rewindable.
+  input=$(cat)
   # The dispatch body is a concatenation of all the fields that can carry placeholders. If any field is missing, it is treated as empty. The jq command extracts these fields and joins them with newlines.
-  body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", .tool_input.summary // "", .tool_input.to // "", .tool_input.scriptPath // "", .tool_input.name // "", (.tool_input.args // "" | tostring)] | join("\n")' 2>/dev/null) ||
-    deny dispatch-check "dispatch payload is not valid JSON — placeholder hygiene unverifiable. Blocked; retry."
+  body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", .tool_input.summary // "", .tool_input.to // "", .tool_input.scriptPath // "", .tool_input.name // "", (.tool_input.args // "" | tostring)] | join("\n")' <<<"$input" 2>/dev/null) ||
+    { echo "[WARN] squads dispatch-check: dispatch payload is not valid JSON — placeholder hygiene unverified, dispatch allowed. Install jq." >&2; exit 0; }
+  # Flat-haiku policy check (skills/squads/SKILL.md#model--fan-out-policy). Warn
+  # only, never deny — and only for Agent, the one tool that carries the param.
+  # Kept out of "$body" so a model name can never read as a placeholder.
+  { read -r tool; read -r model; } < <(jq -r '.tool_name // "", (.tool_input.model // "")' <<<"$input" 2>/dev/null | tr -d '\r')
+  if [[ "$tool" == "Agent" ]]; then
+    if [[ -z "$model" ]]; then
+      echo "[WARN] model param unavailable — agents inherit session model; flat-haiku cost model void" >&2
+    elif [[ "$model" != "haiku" ]]; then
+      echo "[WARN] squads dispatch-check: model '$model' is not haiku — flat-haiku cost model void (skills/squads/SKILL.md:69)." >&2
+    fi
+  fi
   # <untrusted_context> blocks are data to analyze, never instructions — strip them
   # before linting so wrapped third-party content can legitimately contain {{...}}.
   # Same pass fails closed on a misordered/unclosed block (close before open, or
@@ -101,7 +122,7 @@ dispatch_check() {
     !skip
     END { if (skip || bad) exit 3 }
   ' <<<"$body") ||
-    deny dispatch-check "misordered/unclosed <untrusted_context> block — open before close, and close it; wrap braces as data inside."
+    { echo "[WARN] squads dispatch-check: misordered/unclosed <untrusted_context> block — placeholder hygiene unverified, dispatch allowed. Wrap braces as data inside." >&2; exit 0; }
   placeholders=$(grep -oE '\{\{[^{}]*\}\}' <<<"$body" | sort -u | paste -sd, -)
   [[ -z "$placeholders" ]] || deny dispatch-check "unresolved placeholder(s) $placeholders — replace every {{...}} with real values. Wrap third-party data in <untrusted_context>."
   exit 0
@@ -125,6 +146,7 @@ debug_gate() { # debug_gate <tool> <sid> <file_path>
   flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
   [[ -f "$flag" ]] || return 0
   if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
+    echo "squads debug-gate: flag expired (>120min) — gate lifted; re-invoke squads:debug if still mid-debug." >&2
     rm -f "$flag"
     return 0
   fi
@@ -146,14 +168,14 @@ plan_schema_violations() {
   # Every ### TASK-NNN: block must carry all 7 Canonical Task Block field labels.
   missing=$(awk '
     BEGIN { split("Depends on|Files|Symbols|Satisfies|Action|Validate|Expected result", a, "|"); for (i in a) want[a[i]]=1 }
-    /^### TASK-[0-9]+:/ { if (id != "") emit(); match($0, /TASK-[0-9]+/); id=substr($0, RSTART, RLENGTH); delete seen; next }
+    /^### TASK-[0-9]+:/ { if (id != "") emit(); match($0, /TASK-[0-9]+/); id=substr($0, RSTART, RLENGTH); delete seen; files_count=0; next }
     id == "" { next }
-    { for (w in want) if (index($0, w ":") == 1) seen[w]=1 }
+    { for (w in want) if (index($0, w ":") == 1) { seen[w]=1; if (w == "Files") { value=substr($0, length(w)+2); gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); files_count=0; if (value != "") { n=split(value, parts, ","); for (i=1; i<=n; i++) { gsub(/^[[:space:]]+|[[:space:]]+$/, "", parts[i]); if (parts[i] != "") files_count++ } } } } }
     END { if (id != "") emit() }
-    function emit() { m=""; for (w in want) if (!(w in seen)) m=m (m==""?"":", ") w; if (m != "") printf "%s missing: %s\n", id, m }
+    function emit() { m=""; for (w in want) if (!(w in seen)) m=m (m==""?"":", ") w; if (m != "") printf "%s missing: %s\n", id, m; if (files_count > 3) printf "%s Files: lists %d paths (max 3) — decompose per the granularity rule.\n", id, files_count }
   ' <<<"$content")
   [[ -z "$missing" ]] ||
-    printf 'TASK block(s) missing fields — %s. Each ### TASK-NNN: block needs all 7: Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result.\n' "$(printf '%s' "$missing" | tr '\n' '; ')"
+    printf '%s Each ### TASK-NNN: block needs all 7 fields (Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result) and at most 3 paths in Files:.\n' "$(printf '%s' "$missing" | tr '\n' ';')"
 }
 
 # Canonical Task Block guard on Write to a docs/plan/*.plan.md. Write-only: Edit's
@@ -170,7 +192,7 @@ plan_schema() { # plan_schema <file_path> <content>
 # plan-schema on Write. No jq → the flags were never set either; nothing to
 # enforce.
 pre_tool() {
-  command -v jq >/dev/null 2>&1 || exit 0
+  command -v jq >/dev/null 2>&1 || { echo "squads pre-tool: jq not found — debug-gate and plan-schema not applied." >&2; exit 0; }
   local input tool="" sid="" file_path="" content=""
   input=$(cat)
   # Single jq for scalars. `read` (bash 3.2+), NOT `mapfile` (bash 4.0+): the
@@ -214,6 +236,20 @@ post_tool() {
         squads:debug) touch "$(state_dir)/squads-debug-gate-${sid:-unknown}" ;;
         squads:tdd | squads:plan | squads:review) rm -f "$(state_dir)/squads-debug-gate-${sid:-unknown}" ;;
       esac
+      exit 0
+      ;;
+    Agent)
+      # Check if tool_response is a JSON object with required Handoff Contract keys
+      if ! jq -e '(.tool_response | type) == "object"' <<<"$input" >/dev/null 2>&1; then
+        exit 0
+      fi
+      # Check for required keys: status and findings
+      local missing_keys=()
+      jq -e '.tool_response | has("status")' <<<"$input" >/dev/null 2>&1 || missing_keys+=("status")
+      jq -e '.tool_response | has("findings")' <<<"$input" >/dev/null 2>&1 || missing_keys+=("findings")
+      if [[ ${#missing_keys[@]} -gt 0 ]]; then
+        deny handoff "return missing $(IFS=', '; printf '%s' "${missing_keys[*]}") — discard and retry once per skills/squads/SKILL.md:43."
+      fi
       exit 0
       ;;
     Write | Edit | MultiEdit | NotebookEdit) ;;

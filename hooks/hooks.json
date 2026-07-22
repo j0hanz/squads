@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ \"${SQUADS_FAST:-0}\" = \"1\" ]; then bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start; elif command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" session-start; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" session-start; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start; fi",
+            "command": "if [ \"${SQUADS_PERF:-0}\" = \"1\" ]; then if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" session-start; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" session-start; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start; fi; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" session-start; fi",
             "timeout": 5
           }
         ]
@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ \"${SQUADS_FAST:-0}\" = \"1\" ]; then bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check; elif command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" dispatch-check; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" dispatch-check; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check; fi",
+            "command": "if [ \"${SQUADS_PERF:-0}\" = \"1\" ]; then if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" dispatch-check; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" dispatch-check; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check; fi; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" dispatch-check; fi",
             "timeout": 10
           }
         ]
@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ \"${SQUADS_FAST:-0}\" = \"1\" ]; then bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool; elif command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" pre-tool; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" pre-tool; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool; fi",
+            "command": "if [ \"${SQUADS_PERF:-0}\" = \"1\" ]; then if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" pre-tool; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" pre-tool; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool; fi; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" pre-tool; fi",
             "timeout": 10
           }
         ]
@@ -36,11 +36,11 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Skill|Write|Edit|MultiEdit|NotebookEdit",
+        "matcher": "Skill|Agent|Write|Edit|MultiEdit|NotebookEdit",
         "hooks": [
           {
             "type": "command",
-            "command": "if [ \"${SQUADS_FAST:-0}\" = \"1\" ]; then bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" post-tool; elif command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" post-tool; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" post-tool; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" post-tool; fi",
+            "command": "if [ \"${SQUADS_PERF:-0}\" = \"1\" ]; then if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" post-tool; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" post-tool; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" post-tool; fi; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" post-tool; fi",
             "timeout": 10
           }
         ]
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "if [ \"${SQUADS_FAST:-0}\" = \"1\" ]; then bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" compact; elif command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" compact; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" compact; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" compact; fi",
+            "command": "if [ \"${SQUADS_PERF:-0}\" = \"1\" ]; then if command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" compact; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" compact; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" compact; fi; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" compact; fi",
             "timeout": 10
           }
         ]

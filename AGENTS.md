@@ -1,7 +1,7 @@
 # AGENTS.md
 
-`squads` is a Claude Code plugin: markdown skills for collaborative software-development workflows — brainstorming, planning, dispatch, TDD, debugging, and code review. There is no build step and no Node runtime; the repo is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json`, `jq` required).
+`CLAUDE.md` and `GEMINI.md` are pointers to this file — put shared instructions here, not in them.
 
-Skills under `skills/` are the source of truth for their own behavior. Read a skill's `SKILL.md` before changing it, and don't restate skill behavior here — that duplicates and rots.
+Skills under `skills/` own their own behavior. Read a skill's `SKILL.md` before changing it, and don't restate skill behavior here or in the README — a second copy drifts.
 
-When two rules conflict, the most specific written instruction wins: an explicit user instruction beats this file, and this file beats a skill's `SKILL.md`.
+`skills/` holds one directory per shipped plugin skill and nothing else. Repo-local skills (`release-plugin`) live in `.claude/skills/` and never move into `skills/`.

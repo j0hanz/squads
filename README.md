@@ -59,7 +59,7 @@ user request → squads-router: first match, invoke the skill directly
 No build step. Checks:
 
 ```bash
-npm ci && npm run format:check   # bash -n on hooks + cross-skill anchor check + prettier (needs Node for the formatter only)
+npm ci && npm run format:check   # bash -n on hooks + prettier (needs Node for the formatter only)
 ruff check .                     # Python lint (config in pyproject.toml)
 python -m pytest                 # scan_context suite
 ```

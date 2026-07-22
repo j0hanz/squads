@@ -57,6 +57,20 @@ session_start() {
   if ! command -v jq >/dev/null 2>&1; then
     echo 'squads: jq not found — dispatch-check will DENY dispatches this session. Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.' >&2
   fi
+  # On compaction the model was already routed this session; emit a one-line
+  # refresher that preserves every routing decision without the banner/tags.
+  # startup|resume|clear (or any unknown/missing source) get the full block —
+  # fresh or reloaded context genuinely needs it. jq missing → full block.
+  local source=""
+  if command -v jq >/dev/null 2>&1; then
+    source=$(jq -r '.source // ""' 2>/dev/null) || source=""
+  fi
+  if [[ "$source" == "compact" ]]; then
+    echo '<squads-router>'
+    echo 'squads routing (refresher): RED/failure -> squads:debug · diff/review feedback -> squads:review · new logic -> squads:tdd · named deliverable (plan/spec/doc) -> squads:plan · open problem -> squads:brainstorm · bulk fan-out / approved docs/plan/*.plan.md -> squads:dispatch-agents · else answer direct.'
+    echo '</squads-router>'
+    return 0
+  fi
   echo "Skill names below invoke via the Skill tool as 'squads:<name>' (e.g. /dispatch-agents -> squads:dispatch-agents)."
   echo
   echo '<squads-router>'

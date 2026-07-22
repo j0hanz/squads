@@ -24,7 +24,10 @@ Record shape (fields omitted when absent; exit omitted when 0):
 exit 2 + the "squads <gate>:" err prefix names the guard that fired
 (debug-gate, dispatch-check, plan-schema); post-tool exit 2
 with no prefix is plan-schema feedback, not a deny. "timeout":1 marks a rule
-killed at CHILD_TIMEOUT and failed open — the R2 residual hooks.json documents.
+killed at CHILD_TIMEOUT. dispatch-check fails CLOSED on that timeout (exit 2,
+matching its jq-missing / bad-payload posture); every other rule fails open.
+Only Claude Code's own outer kill (10s, which the wrapper cannot intercept)
+stays an unfixable fail-open — the R2 residual hooks.json documents.
 """
 
 import json
@@ -98,8 +101,13 @@ def run_rule(
             False,
         )
     except subprocess.TimeoutExpired:
-        # Fail-open, matching Claude Code's own non-blocking hook-timeout path.
-        out, err, code, timed_out = b"", b"", 0, True
+        # dispatch-check is the only fail-CLOSED guard; every other rule fails open on a wrapper timeout.
+        out, err, code, timed_out = (
+            b"",
+            b"" if rule != "dispatch-check" else b"squads dispatch-check: guard timed out -- dispatch blocked. Retry.\n",
+            2 if rule == "dispatch-check" else 0,
+            True,
+        )
     ms = max(0, round((time.perf_counter() - t0) * 1000))
     return {
         "code": code,
@@ -555,6 +563,28 @@ def self_check() -> None:
     ).encode()
     r = run_rule("dispatch-check", misordered)
     assert r["code"] == 2 and b"untrusted_context" in r["err"], r
+
+    # (7) dispatch-check lints SendMessage to/summary and Workflow scriptPath/name
+    # — a {{...}} in any of those metadata fields is caught, not just in prompt.
+    for field in ("to", "summary", "scriptPath", "name"):
+        dirty_meta = json.dumps(
+            {"tool_name": "SendMessage", "tool_input": {field: "do {{x}}"}}
+        ).encode()
+        r = run_rule("dispatch-check", dirty_meta)
+        assert r["code"] == 2 and b"unresolved placeholder" in r["err"], (field, r)
+
+    # (8) dispatch-check fails CLOSED on a child timeout (exit 2 + named err);
+    # every other rule still fails open (unchanged, not asserted here). Stub
+    # sleeps past the 8s CHILD_TIMEOUT; costs 8s wall-clock, run once.
+    with tempfile.TemporaryDirectory() as td:
+        slow = Path(td) / "slow.sh"
+        slow.write_text("sleep 10\n", encoding="utf-8")
+        r = run_rule("dispatch-check", b"{}", script=slow)
+        assert (
+            r["code"] == 2
+            and r["timeout"]
+            and r["err"].startswith(b"squads dispatch-check:")
+        ), r
 
     print("self-check OK")
 

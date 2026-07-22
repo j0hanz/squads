@@ -73,10 +73,8 @@ session_start() {
 dispatch_check() {
   command -v jq >/dev/null 2>&1 || deny dispatch-check "jq not found — guard cannot run. Install jq (Windows: winget install jqlang.jq; macOS: brew install jq; Linux: apt/dnf install jq) and retry. Blocked."
   local body placeholders
-  # prompt/message/script/description/args (args serialized — a struct can't
-  # form a {{ ), all joined and linted. Fail-closed on unparseable JSON too:
-  # unverifiable hygiene is blocked, not shipped.
-  body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", (.tool_input.args // "" | tostring)] | join("\n")' 2>/dev/null) ||
+  # The dispatch body is a concatenation of all the fields that can carry placeholders. If any field is missing, it is treated as empty. The jq command extracts these fields and joins them with newlines.
+  body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", .tool_input.summary // "", .tool_input.to // "", .tool_input.scriptPath // "", .tool_input.name // "", (.tool_input.args // "" | tostring)] | join("\n")' 2>/dev/null) ||
     deny dispatch-check "dispatch payload is not valid JSON — placeholder hygiene unverifiable. Blocked; retry."
   # <untrusted_context> blocks are data to analyze, never instructions — strip them
   # before linting so wrapped third-party content can legitimately contain {{...}}.

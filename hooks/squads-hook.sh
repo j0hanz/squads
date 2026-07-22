@@ -207,6 +207,13 @@ post_tool() {
   esac
   file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null)
   is_plan_path "$file_path" || exit 0
+  # Remember the last plan path touched this session so the PreCompact recap
+  # can name it after compaction. One line, reaped with the rest of squads-*
+  # by session_start's 120-min find. sid sanitized to prevent traversal.
+  local sid_for_plan
+  sid_for_plan=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null)
+  sid_for_plan=$(tr -cd 'a-zA-Z0-9-' <<<"$sid_for_plan" 2>/dev/null)
+  printf '%s\n' "${file_path//\\//}" > "$(state_dir)/squads-last-plan-${sid_for_plan:-unknown}" 2>/dev/null || true
   [[ -r "${file_path//\\//}" ]] || exit 0
   content=$(cat "${file_path//\\//}") || exit 0
   violations=$(printf '%s' "$content" | plan_schema_violations)
@@ -217,6 +224,41 @@ post_tool() {
   exit 0
 }
 
+# ---------- compact ----------
+
+# PreCompact: inject a one-block recap of in-flight squads state so it
+# survives compaction. Two signals: the debug-gate flag (mid-debug) and the
+# last plan path touched. Silent + exit 0 when neither is set — never inject
+# noise, never block compaction. Fail-open on any error.
+compact() {
+  command -v jq >/dev/null 2>&1 || exit 0
+  local input sid flag plan_file recap=""
+  input=$(cat)
+  sid=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null)
+  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
+  flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
+  if [[ -f "$flag" ]]; then
+    # honor the same 120-min expiry as debug_gate so a stale flag isn't
+    # reported as active
+    if [[ -z "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
+      recap="debug-gate ACTIVE (mid-debug — root cause not yet confirmed; code edits blocked. Route to debug/tdd/plan; review also lifts the gate.)"
+    fi
+  fi
+  plan_file="$(state_dir)/squads-last-plan-${sid:-unknown}"
+  if [[ -s "$plan_file" ]]; then
+    local path
+    path=$(head -1 "$plan_file" 2>/dev/null)
+    [[ -n "$path" ]] && recap="${recap:+$recap
+}active plan: $path (re-read it to resume the task thread)"
+  fi
+  [[ -z "$recap" ]] || {
+    printf '<squads-state>\n'
+    printf '%s\n' "$recap"
+    printf '</squads-state>\n'
+  }
+  exit 0
+}
+
 # ---------- dispatch ----------
 
 case "${1:-}" in
@@ -224,6 +266,7 @@ case "${1:-}" in
   dispatch-check) dispatch_check ;;
   pre-tool) pre_tool ;;
   post-tool) post_tool ;;
+  compact) compact ;;
   *)
     echo "squads: unknown rule '${1:-}'" >&2
     exit 0

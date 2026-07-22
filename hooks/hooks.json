@@ -45,6 +45,18 @@
           }
         ]
       }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ \"${SQUADS_FAST:-0}\" = \"1\" ]; then bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" compact; elif command -v python >/dev/null 2>&1; then python \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" compact; elif command -v python3 >/dev/null 2>&1; then python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/perf-hook.py\" compact; else bash \"${CLAUDE_PLUGIN_ROOT}/hooks/squads-hook.sh\" compact; fi",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

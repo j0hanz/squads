@@ -494,6 +494,86 @@ def self_check() -> None:
     assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
     _clean(sid)
 
+    # (9) compact recap: armed debug-gate → ACTIVE in recap; clean → silent.
+    # last-plan tracking: a plan-path Write post-tool records the path, and
+    # the compact recap names it. Routes through the real dispatcher.
+    sid = "schk-compact"
+    _clean(sid)
+    # also remove the last-plan file for this sid
+    _bash(f'rm -f "{_state_expr}/squads-last-plan-{sid}"')
+
+    # clean: no flag, no plan → compact is silent
+    r = run_rule(
+        "compact",
+        json.dumps({"session_id": sid}).encode(),
+    )
+    assert r["code"] == 0 and r["out"] == b"", r
+
+    # arm the debug-gate via post-tool squads:debug → compact reports ACTIVE
+    r = run_rule(
+        "post-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:debug"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and _flag(f"squads-debug-gate-{sid}"), r
+    r = run_rule(
+        "compact",
+        json.dumps({"session_id": sid}).encode(),
+    )
+    assert r["code"] == 0 and b"<squads-state>" in r["out"], r
+    assert b"debug-gate ACTIVE" in r["out"], r
+
+    # record a plan path via a plan-path Write post-tool → recap names it
+    import os as _os
+    td_plan = _bash(f'mktemp -d "{_state_expr}/squadsplan.XXXXXX"').strip()
+    plan_path = f"{td_plan.decode()}/docs/plan/x.plan.md"
+    _bash(f'mkdir -p "{td_plan.decode()}/docs/plan" && printf "Origin: plan\\n" > "{plan_path}"')
+    r = run_rule(
+        "post-tool",
+        json.dumps(
+            {
+                "tool_name": "Write",
+                "tool_input": {"file_path": plan_path, "content": "Origin: plan\n"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0, r
+    r = run_rule(
+        "compact",
+        json.dumps({"session_id": sid}).encode(),
+    )
+    assert r["code"] == 0 and b"active plan:" in r["out"], r
+    assert plan_path.encode() in r["out"] or b"x.plan.md" in r["out"], r
+
+    # lift the gate via post-tool squads:tdd → recap no longer reports ACTIVE
+    r = run_rule(
+        "post-tool",
+        json.dumps(
+            {
+                "tool_name": "Skill",
+                "tool_input": {"skill": "squads:tdd"},
+                "session_id": sid,
+            }
+        ).encode(),
+    )
+    assert r["code"] == 0 and not _flag(f"squads-debug-gate-{sid}"), r
+    r = run_rule(
+        "compact",
+        json.dumps({"session_id": sid}).encode(),
+    )
+    assert r["code"] == 0 and b"debug-gate ACTIVE" not in r["out"], r
+    assert b"active plan:" in r["out"], r  # plan file still recorded
+
+    _bash(f'rm -f "{_state_expr}/squads-last-plan-{sid}"')
+    _bash(f'rm -rf "{td_plan.decode()}"')
+    _clean(sid)
+
     # (5) plan-schema: a full Canonical Task Block passes; dropping one field
     # denies and names it — exercises the 7-field awk, not just the Origin
     # short-circuit that test (3) covers.

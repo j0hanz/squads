@@ -1,6 +1,6 @@
 {
   "name": "squads",
-  "version": "0.14.0",
+  "version": "0.15.0",
   "type": "module",
   "description": "A plugin for multi-agent workflows like planning, code review, and test-driven development",
   "author": {

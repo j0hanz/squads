@@ -24,5 +24,9 @@ for def in \
   fi
 done
 
+# Clear both on failure: a non-empty `def` (last candidate tried) or a stale
+# `DEF` from an earlier source would read as a successful resolve.
+def=""
+unset DEF
 echo "could not resolve default branch — pass explicit base" >&2
 return 1 2>/dev/null || exit 1

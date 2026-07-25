@@ -133,7 +133,7 @@ Run before save. Failed HIGH items block save; lower items warn and continue.
 
 ### Plant-breach drill
 
-Runnable drill exercising both HIGH items: plants two breach inputs in a temp dir and asserts the checklist catches each — (1) a write-breach investigator prompt (`agent()` description containing "write the fix") caught by the no-write grep; (2) a stage-omitted script caught by the required-stage diff. Run `references/plant-breach-drill.sh` as-is.
+Runnable drill exercising both HIGH items: plants two breach inputs in a temp dir and asserts the checklist catches each — (1) a write-breach investigator prompt (`agent()` prompt containing "write the fix") caught by the no-write grep; (2) a stage-omitted script caught by the required-stage diff. Run `references/plant-breach-drill.sh` as-is.
 
 ## Annotated `debug-verify` example script
 

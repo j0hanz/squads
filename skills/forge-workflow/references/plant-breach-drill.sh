@@ -21,8 +21,10 @@ EOF
 # Negation-aware no-write check: strip "do not ..."/"don't ..." denial clauses
 # (up to the next sentence boundary) before grepping for write verbs. A verb
 # that survives the strip is an actual permission = breach.
+# Bracket classes, not a case-insensitive flag: `s///I` is GNU-only and this
+# drill runs as-is on macOS too.
 strip_denials() {
-  sed -E 's/do not[^.]*\./ /g; s/don'"'"'t[^.]*\./ /g; s/Do not[^.]*\./ /g' "$1"
+  sed -E 's/[Dd]o not[^.]*\./ /g; s/[Dd]on'"'"'t[^.]*\./ /g' "$1"
 }
 VERBS='write|edit|create|modify|patch|overwrite|delete|remove'
 

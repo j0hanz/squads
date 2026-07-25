@@ -445,15 +445,21 @@ def _find_test_file(file_path: Path, cwd: Path) -> str:
     return ""
 
 
-def _scan_constraints(file_path: Path) -> list[str]:
-    """Scan a file for constraint signals (TODOs, rate limits, timeouts)."""
+def _scan_constraints(file_path: Path, display: str) -> list[str]:
+    """Scan a file for constraint signals (TODOs, rate limits, timeouts).
+
+    `display` is the workspace-relative posix path used in the emitted
+    `path:line:` prefix. `file_path` is absolute (cwd is resolved in main), and
+    every other path field in the report is relative — reusing it here would
+    make constraints the one field carrying an absolute native path.
+    """
     hits: list[str] = []
     try:
         with file_path.open(encoding="utf-8-sig", errors="replace") as fh:
             for line_no, line in enumerate(fh, 1):
                 ll = line.lower()
                 if any(pat in ll for pat in _CONSTRAINT_PATTERNS_LOWER):
-                    hits.append(f"{file_path}:{line_no}: {line.strip()[:120]}")
+                    hits.append(f"{display}:{line_no}: {line.strip()[:120]}")
                     if (
                         len(hits) == _MAX_CONSTRAINTS_PER_FILE
                     ):  # stop reading early
@@ -821,7 +827,7 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             pool.submit(_git_log, f.path, cwd): f for f in result.related_files
         }
         constraint_futures = {
-            pool.submit(_scan_constraints, cwd / f.path): f.path
+            pool.submit(_scan_constraints, cwd / f.path, f.path): f.path
             for f in result.related_files
         }
         # Combined shape+import extraction in one read per file (REQ-005).

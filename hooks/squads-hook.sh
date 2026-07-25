@@ -89,8 +89,6 @@ is_plan_path() { # is_plan_path <path> → 0 if a docs/plan/*.plan.md
 # ---------- session-start ----------
 
 session_start() {
-  # Reap stale per-session state from crashed sessions (120-min horizon).
-  find "$(state_dir)" -maxdepth 1 -name 'squads-*' -mmin +120 -exec rm -f {} + 2>/dev/null || true
   # Plain text, not notify(): stdout here is added to context verbatim, and valid
   # JSON on stdout would be parsed as hook output, swallowing the router block.
   local input source="" sid=""
@@ -106,6 +104,12 @@ session_start() {
     echo 'squads: jq not found — every gate fails OPEN this session (placeholder, debug-gate and plan-schema checks are skipped, each with a warning). Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.'
     echo
   fi
+  # Reap stale per-session state from crashed sessions (120-min horizon). Runs
+  # AFTER sid is known and skips this session's own files: on resume/compact the
+  # live debug-gate flag and plan pointer are routinely older than the horizon,
+  # and the recap below still has to read them.
+  find "$(state_dir)" -maxdepth 1 -name 'squads-*' ! -name "*-${sid:-unknown}" \
+    -mmin +120 -exec rm -f {} + 2>/dev/null || true
   # Compaction: already routed this session, so emit a one-line refresher plus
   # in-flight state compaction would otherwise drop. Only place the recap can
   # live — PreCompact stdout never reaches context. Any other source (or jq
@@ -168,8 +172,9 @@ dispatch_check() {
     fi
   fi
   # <untrusted_context> is data, never instructions — strip it so wrapped
-  # third-party content can legitimately contain {{...}}. Same pass fails closed
-  # on a misordered/unclosed block: either could smuggle a placeholder past.
+  # third-party content can legitimately contain {{...}}. A misordered/unclosed
+  # block fails OPEN and loudly (notify + exit 0), per this rule's fail-open
+  # policy — the strip is abandoned rather than applied to an ambiguous body.
   body=$(awk '
     /^<untrusted_context>[[:space:]]*$/  { if (skip) { bad = 1; exit } skip = 1; next }
     /^<\/untrusted_context>[[:space:]]*$/ { if (!skip) { bad = 1; exit } skip = 0; next }

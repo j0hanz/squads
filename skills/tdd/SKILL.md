@@ -21,30 +21,38 @@ Escape hatch from the HARD GATE. Never self-invoke silently: match the request t
 1. **Recommended** — Skip TDD: [matching category] because [specific reason].
 2. **Alternative** — Full TDD anyway + why the escape hatch doesn't apply.
 
+**Announce (both paths):** first output line — `squads:tdd — <path> for <behavior>`, e.g. `squads:tdd — interactive TDD for "parse duration string"` or `squads:tdd — approved-plan handoff (TASK-004), entering at RED`. Escape hatch taken → say which category and why on the same line. Plain words, no pause.
+
 ## Autonomous invocation (approved-plan handoff)
 
-Invoked by `plan`/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or `debug`: skip Step 0 and the Pre-TDD `AskUserQuestion` gates — scope, interface, repro case are locked. Derive interface/behavior and test path from the handoff; state it in one line. Enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply.
+Invoked by `plan`/`dispatch-agents` (an APPROVED `docs/plan/<name>.plan.md` task) or `debug`: skip the Step 0 `AskUserQuestion` entirely — scope, interface, repro case are locked. Derive interface/behavior and test path from the handoff; state it in one line. Enter the TDD Cycle at RED. All other gates (observed RED, N-1 check, Red Flags) still apply.
 
 Per-origin delta:
 
 - **`plan`/`dispatch-agents`:** derive interface, errors, test path from the task block's `Action:`, `Satisfies:`, `Files:`, `Validate:`.
 - **`debug`:** derive behavior from the repro and verbatim failing output. Skip Step 1 sub-step 2 (stub) — the implementation exists and is the source of the failure. Run the repro test against existing code, confirm RED.
 
-## Step 0: Confirm Scope
+## Step 0: Confirm Scope and Interface (one ask)
 
-**action:** `AskUserQuestion`. _Skip for approved-plan handoff._
+**action:** ONE `AskUserQuestion` call carrying BOTH decisions as two questions — never two calls, never two turns. _Skip entirely for approved-plan handoff._
+
+Question 1 — scope:
 
 1. **Recommended:** Start TDD for [feature].
 2. **Alternative:** Explore first, then TDD — state why exploration is needed before code.
 
-**Done when:** user confirms feature scope and entry point.
+Question 2 — interface shape:
+
+1. **Recommended:** `name(inputs) -> output` — the shape derived from the request and the codebase.
+2. **Alternative:** propose a different shape, justify.
+
+Derive the proposed shape from the request and a read of the target file BEFORE asking, so question 2 arrives with a real recommendation, not a blank. User picks "Explore first" on question 1 → explore, then re-ask question 2 alone if the shape changed.
+
+**Done when:** one `AskUserQuestion` call answered, giving feature scope, entry point, and interface shape.
 
 ## Pre-TDD: Define the Interface
 
-**action:** `AskUserQuestion` to lock the shape before any test. _For approved-plan handoff, derive from the task block, no ask._
-
-1. **Recommended:** `name(inputs) -> output`.
-2. **Alternative:** propose a different shape, justify.
+**action:** no second question — the shape was locked in Step 0. Restate it in one line (`name(inputs) -> output`), then fill in the rest below. _For approved-plan handoff, derive from the task block, no ask._
 
 - List expected errors.
 - Give 2-3 call-site examples.
@@ -52,7 +60,7 @@ Per-origin delta:
 - Start the **behavior list**: happy path + errors; grows one edge case per RED cycle. Coverage gauge for REFACTOR.
 - **Gate:** run existing tests first — clean baseline required. Baseline RED → stop: route pre-existing failures to `debug`, or get user confirmation to proceed with those tests excluded from this cycle's GREEN.
 
-**Done when:** interface, errors, test path locked and confirmed.
+**Done when:** interface restated, errors, examples, and test path listed; baseline gate run.
 
 ## Step 1: RED (Failing Test)
 

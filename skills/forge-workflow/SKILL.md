@@ -83,7 +83,7 @@ One session-scoped pass per workflow. Steps sequential; each gates the next.
 
 1. **Preflight** (once per session, see §Preflight) — assert native dynamic workflows available; abort with clear message if not. No fallback.
 2. **Interview** — elicit job shape: goal, input size, fetch vs. edit, recurrence. Match to a Recipe Catalog archetype; none fit → compose from Pattern Canon and say so. **Spec path:** when dispatch supplies a Composition Spec, SKIP the interview and adopt the Spec's `stages`/`class`/`budget_tokens`/`agent_cap` directly — Script Audit (step 5) and smoke-slice (step 6) still run, non-skippable.
-3. **Recipe** — pick the catalog row; carry its composition, default scale, `args` signature, and class forward. Reject any recipe duplicating a lifecycle mandate (see §Script Audit Checklist).
+3. **Recipe** — pick the catalog row; carry its composition, default scale, `args` signature, and class forward. Reject any recipe duplicating a lifecycle mandate (see §Script Audit Checklist). **Announce** the pick before codegen — `squads:forge-workflow — recipe <name> · about <n> agents`, e.g. `squads:forge-workflow — recipe fan-out-synthesize · about 11 agents`. Plain words, no pause. Over the [size-preview threshold](../plan/SKILL.md#fan-out-scaling), add the downshift — `squads:forge-workflow — recipe fan-out-synthesize · about 11 agents (say "smaller" to run a reduced args slice)`. Statement, not a question.
 4. **Native codegen** — emit `.claude/workflows/<name>.js` embedding all seven Generation Contract invariants: distinct `agent()` per stage with Handoff-Contract `schema`, in-script bare-claim truncation, `args` defaults at top, `model: 'haiku'` per stage, agent-count cap computed and asserted, and `<untrusted_context>` wrapping every external-`args` interpolation.
 5. **Script Audit Checklist** — run it (§Script Audit Checklist). Failed HIGH items block save.
 6. **Smoke-slice run** — execute the same script with a small `args` slice. Failure blocks save; fix and re-run until green. Auto-mode (spec path): retry once; second failure FAILs out to debug.
@@ -144,7 +144,7 @@ Reference-only, not a shipped artifact. See `references/debug-verify-example.js.
 Once per session, before any other Procedure step.
 
 - **Check:** Claude Code version ≥ **2.1.154** AND paid plan AND dynamic workflows not disabled. Runtime is a plugin-level hard dependency for bulk and debug fan-out.
-- **On failure:** abort with "Native dynamic workflows unavailable (need CC ≥ 2.1.154, paid plan, not disabled). Cannot forge. No fallback."
+- **On failure:** abort with "Native dynamic workflows unavailable (need CC ≥ 2.1.154, paid plan, not disabled). Cannot forge — no fallback, a workflow that cannot be smoke-sliced does not get saved. Still available without the runtime: `dispatch-agents` inline fleets, and `debug` single-threaded."
 - **No fallback:** user decision recorded in the design brief — one execution path. Never degrade to turn-by-turn Agent dispatches; the invariants (in-script truncation, quorum tally, agent-count cap) are unenforceable outside the runtime. Forge refuses to generate a workflow it cannot smoke-slice natively.
 
 ## Next Skills

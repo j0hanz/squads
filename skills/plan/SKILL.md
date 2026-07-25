@@ -16,7 +16,7 @@ Resolve in order:
 2. First positional resolves to any other existing file (design doc, notes) → **draft** mode: read it; content is the feature description. Base name = kebab-case of topic, stripping date prefixes and `-design`/`.md` suffixes (`2026-07-20-x-redesign-design.md` → `x-redesign`). If it records a locked or user-approved design, ideation is settled: skip Step 2 entirely — main thread sequences tasks inline from the locked design (depth still governs validation).
 3. Otherwise → **draft** mode: argument is free-text feature description; base name = kebab-case of it (`new-login-flow`).
 
-No `AskUserQuestion` for mode. Announce mode in the first output line — in draft, also announce inferred depth, K (slices), and ideator count. No pause.
+No `AskUserQuestion` for mode. **Announce:** first output line, plain words, no internal terms (no "K", no "lens × slice") — `squads:plan — <mode> mode<, <depth> depth> · <n> files in <k> groups · <m> drafting agents`, e.g. `squads:plan — draft mode, contract depth · 37 files in 4 groups · 8 drafting agents` or `squads:plan — validate mode · 12 tasks in 3 chunks · 4 critics`. Over the size-preview threshold, add the downshift — `squads:plan — draft mode, blueprint depth · 60 files in 5 groups · 15 drafting agents (say "contract" for a lighter pass)`. No pause.
 
 ## Draft Mode
 
@@ -40,6 +40,7 @@ All draft/validate fan-outs scale with surface size — many small-task agents, 
 - **Slices (draft):** partition Step 1 candidate files into K clusters along directory/subsystem boundaries, ~12 files per slice (K = ceil(candidate_files / 12), min 1). If K × lens_count > 20, merge smallest slices until it fits and say so in the announce line — silent caps read as full coverage.
 - **Chunks (validate):** partition plan Task Blocks into C groups of ≤5 consecutive blocks (C = ceil(task_count / 5)); same wave cap and announce rule.
 - **Wave cap:** ≤20 agents per wave, dispatched in ONE message; ~10 run concurrently, rest queue (per dispatch-agents invariants); model and per-branch timeout per [dispatch-agents #model--fan-out-policy](../squads/SKILL.md#model--fan-out-policy) / [#invariants--apply-to-every-dispatch](../squads/SKILL.md#invariants--apply-to-every-dispatch).
+- **Size preview:** >6 agents in one wave, or >10 across the run → the announce line states the count and one real downshift: `· about <n> agents (say "contract" for a lighter pass)`. Statement, not a question — no `AskUserQuestion`, no pause. At or below both thresholds, say nothing extra. Offer `--depth contract` only when depth resolved to `blueprint`.
 - **Small-task rule:** every dispatched agent is scoped to one slice, chunk, or lens — whole-surface context belongs only to the final merger (Step 3) and the spec-coherence critic (Step 8).
 - **Recovery:** malformed/empty agent output → re-dispatch once with the required format; second failure → record the gap and proceed (draft) or escalate to user (validate).
 
@@ -83,7 +84,7 @@ Save both files with headers `Status: DRAFT`, `Depth: <contract|blueprint>` (Ste
 
 ### Headless Fallback (REVISE from validate mode)
 
-Re-run the final merge only — never re-dispatch ideators or per-slice mergers. `contract`: main thread re-synthesizes with REVISE findings as constraints. `blueprint`: re-dispatch the Synthesizer with REVISE findings; it returns revised content for BOTH files — specs.md fixes included, never patched ad hoc by main thread — and main thread writes both. Re-submit to validate mode. Second REVISE → write detailed error summary, notify user high-priority, stop (no `AskUserQuestion`).
+Re-run the final merge only — never re-dispatch ideators or per-slice mergers. `contract`: main thread re-synthesizes with REVISE findings as constraints. `blueprint`: re-dispatch the Synthesizer with REVISE findings; it returns revised content for BOTH files — specs.md fixes included, never patched ad hoc by main thread — and main thread writes both. Re-submit to validate mode. Second REVISE → write detailed error summary, notify user high-priority, stop (no `AskUserQuestion`) — the summary names the unresolved findings by `REQ-NNN`/`TASK-NNN` and states the two ways forward: edit the pair by hand and re-submit to validate mode, or re-run draft mode with a narrower feature description.
 
 ## Validate Mode
 

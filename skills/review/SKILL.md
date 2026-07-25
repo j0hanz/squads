@@ -16,6 +16,8 @@ Fresh-eye review of a verified diff, or resolve review feedback. Two modes, argu
 - neither signal → `AskUserQuestion`
 - empty arg → request mode (uncommitted working tree)
 
+**Announce:** first output line, before any git command or dispatch — `squads:review — <mode> mode (<why, plain words>)`, e.g. `squads:review — request mode (argument is a branch ref) · reviewing feature/x against main` or `squads:review — resolve mode (argument is feedback prose, not a ref)`. No pause; the user corrects it by replying. The `AskUserQuestion` case above is the one exception — ask, then announce the answer.
+
 ## Request Mode
 
 ### Step 1: Verify prerequisites
@@ -26,12 +28,12 @@ Fresh-eye review of a verified diff, or resolve review feedback. Two modes, argu
      1. Classify target → `head`. `git rev-parse --verify <target>` succeeds → branch/commit (`head=<target>`); else path (`head=HEAD`, append `-- <target>` to diff in step 5); no target → uncommitted mode.
      2. Resolve default branch → `$def`. Source `${CLAUDE_PLUGIN_ROOT}/skills/review/scripts/resolve-base.sh`; it loops standard candidates, exports `DEF` (`${CLAUDE_PLUGIN_ROOT}` contains skills/, resolves in any workspace). `$def` won't verify → abort, report "could not resolve default branch — pass explicit base".
      3. Compute `base = git merge-base "$def" "$head"` (or given base).
-     4. Never force-clean the tree. Run `git status --porcelain`; dirty → abort, report — never `stash`/`checkout`/`reset`. Committed mode needs a clean tree; reviewer may Read working-tree files for context.
+     4. Never force-clean the tree. Run `git status --porcelain`; dirty → abort, report "working tree is dirty, so a committed-mode review would show reviewers uncommitted context that is not in the diff — commit or stash the listed files yourself, or re-run with no target to review the working tree instead" and list the dirty paths. Never `stash`/`checkout`/`reset` on the user's behalf. Committed mode needs a clean tree; reviewer may Read working-tree files for context.
      5. Capture diff: `git diff "$base".."$head"` (append `-- <path>` if given).
    - **Uncommitted** (working tree): capture `git diff` plus `git diff --staged` as the diff text block.
 3. Guard against empty diff:
-   - **Committed**: `git diff --stat "$base".."$head"` (append `-- <path>` if given). Empty → abort, report.
-   - **Uncommitted**: `git diff --stat HEAD` (covers staged + unstaged). Empty AND `git status --porcelain` shows no untracked (`??`) entries → abort, report. (Untracked files aren't in `git diff` but are reviewable — must not false-abort.)
+   - **Committed**: `git diff --stat "$base".."$head"` (append `-- <path>` if given). Empty → abort, report "no changes between <base> and <head>" plus the resolved base and head SHAs — "already merged, or the wrong target; pass a different ref, or re-run with no target to review the working tree".
+   - **Uncommitted**: `git diff --stat HEAD` (covers staged + unstaged). Empty AND `git status --porcelain` shows no untracked (`??`) entries → abort, report "working tree is clean — nothing to review; pass a branch or commit to review committed work instead". (Untracked files aren't in `git diff` but are reviewable — must not false-abort.)
 4. **Done when:** tests green, non-empty diff in hand, (committed mode) tree clean.
 
 ### Step 2: Dispatch reviewers
@@ -41,7 +43,7 @@ Fresh-eye review of a verified diff, or resolve review feedback. Two modes, argu
    - **Reviewer B — safety lens:** security, input validation, resource/error handling, reuse/simplification.
 2. Fill every `{{...}}` before each dispatch. `{{plan_summary}}` = one or two sentences of change intent, from plan task or commit message(s) in `"$base".."$head"`; neither exists → derive from the diff. `{{diff}}` = Step 1 diff. `{{lens}}` = that reviewer's lens line above.
 3. Each subagent must return these headers exactly: `## Code Review Result`, `**Status**: PASS|FAIL`, `### Blocking Issues`, `### Advisory Issues`, `### What Was Checked`.
-4. A reviewer's header missing or malformed → retry that reviewer once with reminder; second failure aborts the review.
+4. A reviewer's header missing or malformed → retry that reviewer once with reminder; second failure aborts the review — report which reviewer failed, paste the other reviewer's output verbatim so the run is not wasted, and state that a single reviewer is not the quorum: "one lens only — re-run for a full review."
 5. **Done when:** both subagents return well-formed output with all required headers.
 
 #### Dispatch prompt (per reviewer)

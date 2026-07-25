@@ -38,7 +38,7 @@ Governor emits `{mode, class, reason}`:
 ```
 mode:   inline | composed
 class:  read-only | fetch | edit   # Governor-set, final; edit/fetch need approval
-reason: <one-line decision log, shown to user>
+reason: <one-line decision log, shown to user — plain words, and say the agent count: "squads:dispatch-agents — composed · about 12 agents (whole-repo audit, recurring)">
 ```
 
 ### Composition Spec (dispatch-agents → forge-workflow)
@@ -53,7 +53,7 @@ agent_cap:        <int>                     # Governor-determined, guidance only
 success_criteria: <rubric / stop condition, written before dispatch>
 ```
 
-`budget_tokens`, `agent_cap`, `success_criteria` are guidance only, never runtime-enforced — plugin ships markdown only.
+`budget_tokens`, `agent_cap`, `success_criteria` are guidance only, never runtime-enforced — plugin ships markdown only. `agent_cap` is nonetheless user-visible: over the [size-preview threshold](../plan/SKILL.md#fan-out-scaling) the Governor `reason` line states it with a downshift — `squads:dispatch-agents — composed · about 12 agents (say "inline" for a small fleet instead)`. Statement, not a question.
 
 **Class-collapse:** read-only ∪ fetch = fetch; read-only ∪ edit = edit; fetch ∪ edit = REJECT (forge fetch-XOR-edit invariant).
 

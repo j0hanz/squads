@@ -12,8 +12,10 @@ child's outcome still passes through; a wrapper crash exits 0 (fail-open,
 same as a Claude Code command-hook error).
 
 Log dir:   $PERF_LOG_DIR or ~/.claude/squads-perf
-Report:    perf-hook.py report
 Self-test: perf-hook.py --self-check
+
+Any other argv is treated as a <rule> and forwarded to squads-hook.sh; there
+is no reporting subcommand — read the JSONL directly.
 
 Record shape (fields omitted when absent; exit omitted when 0):
 
@@ -82,7 +84,10 @@ def find_bash() -> str:
 
 
 def run_rule(
-    rule: str, payload: bytes, script: Path | None = None, timeout: int | None = None
+    rule: str,
+    payload: bytes,
+    script: Path | None = None,
+    timeout: int | None = None,
 ) -> dict[str, Any]:
     """Run squads-hook.sh <rule> with the payload on stdin, wall-clocked."""
     script = script or Path(__file__).with_name("squads-hook.sh")
@@ -261,12 +266,18 @@ def self_check() -> None:
     assert r["code"] == 2 and b"unresolved placeholder" in r["err"], r
     # model field handling: haiku is silent, others warn, absent warns
     with_haiku = json.dumps(
-        {"tool_name": "Agent", "tool_input": {"prompt": "do it", "model": "haiku"}}
+        {
+            "tool_name": "Agent",
+            "tool_input": {"prompt": "do it", "model": "haiku"},
+        }
     ).encode()
     r = run_rule("dispatch-check", with_haiku)
     assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
     with_opus = json.dumps(
-        {"tool_name": "Agent", "tool_input": {"prompt": "do it", "model": "opus"}}
+        {
+            "tool_name": "Agent",
+            "tool_input": {"prompt": "do it", "model": "opus"},
+        }
     ).encode()
     r = run_rule("dispatch-check", with_opus)
     assert r["code"] == 0 and b"is not haiku" in r["err"], r
@@ -444,13 +455,18 @@ def self_check() -> None:
     # record a plan path via a plan-path Write post-tool → recap names it
     td_plan = _bash(f'mktemp -d "{_state_expr}/squadsplan.XXXXXX"').strip()
     plan_path = f"{td_plan.decode()}/docs/plan/x.plan.md"
-    _bash(f'mkdir -p "{td_plan.decode()}/docs/plan" && printf "Origin: plan\\n" > "{plan_path}"')
+    _bash(
+        f'mkdir -p "{td_plan.decode()}/docs/plan" && printf "Origin: plan\\n" > "{plan_path}"'
+    )
     r = run_rule(
         "post-tool",
         json.dumps(
             {
                 "tool_name": "Write",
-                "tool_input": {"file_path": plan_path, "content": "Origin: plan\n"},
+                "tool_input": {
+                    "file_path": plan_path,
+                    "content": "Origin: plan\n",
+                },
                 "session_id": sid,
             }
         ).encode(),
@@ -540,7 +556,7 @@ def self_check() -> None:
             "tool_input": {
                 "prompt": "analyze:\n<untrusted_context>\n"
                 "user: {{foo}}\n</untrusted_context>\ndone",
-                "model": "haiku"
+                "model": "haiku",
             },
         }
     ).encode()
@@ -551,7 +567,7 @@ def self_check() -> None:
             "tool_name": "Agent",
             "tool_input": {
                 "prompt": "</untrusted_context>\n{{x}}\n<untrusted_context>",
-                "model": "haiku"
+                "model": "haiku",
             },
         }
     ).encode()
@@ -565,14 +581,19 @@ def self_check() -> None:
             {"tool_name": "SendMessage", "tool_input": {field: "do {{x}}"}}
         ).encode()
         r = run_rule("dispatch-check", dirty_meta)
-        assert r["code"] == 2 and b"unresolved placeholder" in r["err"], (field, r)
+        assert r["code"] == 2 and b"unresolved placeholder" in r["err"], (
+            field,
+            r,
+        )
 
     # (8) dispatch-check fails open on a child timeout (exit 0 + [WARN] err);
     # every rule fails open. Stub sleeps past SELF_CHECK_TIMEOUT; quick assertion.
     with tempfile.TemporaryDirectory() as td:
         slow = Path(td) / "slow.sh"
         slow.write_text("sleep 2\n", encoding="utf-8")
-        r = run_rule("dispatch-check", b"{}", script=slow, timeout=SELF_CHECK_TIMEOUT)
+        r = run_rule(
+            "dispatch-check", b"{}", script=slow, timeout=SELF_CHECK_TIMEOUT
+        )
         assert (
             r["code"] == 0
             and r["timeout"]

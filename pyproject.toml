@@ -1,5 +1,9 @@
 [tool.ruff]
-target-version = "py314"
+# Minimum interpreter the shipped scripts must run on, not just a lint dialect:
+# hooks/perf-hook.py and skills/**/scripts/*.py are invoked with whatever
+# python/python3/py is on the user's PATH. Keep this at the real floor so
+# `ruff check .` rejects syntax that floor cannot parse.
+target-version = "py311"
 line-length = 79
 
 [tool.ruff.lint]

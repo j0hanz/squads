@@ -27,7 +27,7 @@ def _git_available() -> bool:
             timeout=5,
         )
         return True
-    except FileNotFoundError, subprocess.TimeoutExpired:
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         return False
 
 
@@ -379,6 +379,38 @@ def test_analog_rank_prefers_import_overlap(tmp_path):
 
 
 @_GIT_REQUIRED
+def test_analog_rank_beats_alphabetical_above_cap(tmp_path):
+    """The overlap rank must reach candidates past _MAX_ANALOGOUS.
+
+    Regression: imports were read only for the 2 alphabetically-first
+    candidates, so everything else scored 0 and the rank could never promote
+    them — the top-2 set was always the alphabetical top-2.
+    """
+    _init_git_repo(tmp_path)
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "foo.py").write_text(
+        "import sharedlib\nsearch = 1\n", encoding="utf-8"
+    )
+    # Three zero-overlap adjacent files that sort BEFORE the high-overlap one.
+    for name in ("a_1.py", "a_2.py", "a_3.py"):
+        (tmp_path / "src" / name).write_text(
+            "import os\nquery = 1\n", encoding="utf-8"
+        )
+    # Sorts last alphabetically, but shares the project import.
+    (tmp_path / "src" / "z_high.py").write_text(
+        "import sharedlib\nquery = 1\n", encoding="utf-8"
+    )
+    _git_commit_all(tmp_path)
+    result = sc.scan(["search"], tmp_path)
+
+    assert result.analogous_features[0].endswith("z_high.py"), (
+        f"overlap rank did not reach past the cap: {result.analogous_features}"
+    )
+    # Full candidate total is reported, not the ranked window.
+    assert result.truncated["analogous_features"] == "2/4"
+
+
+@_GIT_REQUIRED
 def test_analog_rank_deterministic_across_seeds(tmp_path):
     """analogous_features output is identical under PYTHONHASHSEED=0 and =1."""
     import os
@@ -482,7 +514,9 @@ def test_truncated_reports_overflow_and_under_cap(tmp_path):
     assert "constraints" in result.truncated
     # Before capping, we had at least 5 (and up to 15 from 5 files * 3 per file)
     kept_constraints = len(result.constraints)
-    assert result.truncated["constraints"].split("/")[0] == str(kept_constraints)
+    assert result.truncated["constraints"].split("/")[0] == str(
+        kept_constraints
+    )
 
 
 @_GIT_REQUIRED

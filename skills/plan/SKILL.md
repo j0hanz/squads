@@ -151,7 +151,7 @@ On APPROVED: flip `Status: DRAFT` → `Status: APPROVED` in the plan header, the
 
 ## Canonical Task Block Schema
 
-Required in all final `specs.md` and `plan.md` outputs; ideator proposals exempt. (The `plan-schema` hook in `hooks/squads-hook.sh` enforces this on every Write/Edit to `docs/plan/*.plan.md` — 7 required fields + `Files:` max 3 paths.)
+Required in all final `specs.md` and `plan.md` outputs; ideator proposals exempt. (The `plan-schema` hook in `hooks/squads-hook.sh` **denies** a violating `Write` to `docs/plan/*.plan.md` — 7 required fields + `Files:` max 3 paths. `Edit`/`MultiEdit` are not denied: `old_string`/`new_string` is a partial view of the file, so an edit instead gets the same violations back as PostToolUse stderr feedback, after it lands.)
 
 ```markdown
 ### TASK-NNN: [Action title]

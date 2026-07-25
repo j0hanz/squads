@@ -25,7 +25,7 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). Install `jq` on PATH for placeholder, debug-gate, and plan-schema validation (recommended but not required — all gates fail OPEN with a `[WARN]` on stderr without it; Windows: `winget install jqlang.jq`; macOS: `brew install jq`; Linux: `apt/dnf install jq`). No build step or Node runtime; the plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json` running bare bash by default, `SQUADS_PERF=1` opts into the Python perf wrapper, 10s PreToolUse timeout).
+> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). Install `jq` on PATH for placeholder, debug-gate, and plan-schema validation (recommended but not required — all gates fail OPEN with a `[WARN]` on stderr without it; Windows: `winget install jqlang.jq`; macOS: `brew install jq`; Linux: `apt/dnf install jq`). No build step or Node runtime. Python **3.11+** is needed only by the two optional Python scripts — brainstorm's `scan_context.py` (falls back to grep without it) and the `SQUADS_PERF=1` perf wrapper (falls back to bare bash); neither is on the default path. The plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json` running bare bash by default, `SQUADS_PERF=1` opts into the Python perf wrapper, 10s PreToolUse timeout).
 
 ## Usage
 
@@ -60,8 +60,10 @@ No build step. Checks:
 
 ```bash
 npm ci && npm run format:check   # bash -n on hooks + prettier (needs Node for the formatter only)
-ruff check .                     # Python lint (config in pyproject.toml)
+ruff check .                     # Python lint + the 3.11 floor (target-version in pyproject.toml)
 python -m pytest                 # scan_context suite
+python hooks/perf-hook.py --self-check        # hook dispatcher end-to-end
+bash skills/forge-workflow/references/plant-breach-drill.sh   # Script Audit HIGH items
 ```
 
 ## License

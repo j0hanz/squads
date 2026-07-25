@@ -44,13 +44,13 @@ fi
 # script misses its distinct agent() call.
 printf 'stages: investigate, refute, tally\n' > "$tmp/recipe.txt"
 cat > "$tmp/script.js" <<'EOF'
-agent({ description: "investigate stage" });
-agent({ description: "tally stage" });
+agent("investigate stage", { label: "investigate" });
+agent("tally stage", { label: "tally" });
 EOF
 
 # HIGH item 2 — recipe-vs-script required-stage diff: every recipe stage
 # must appear as a distinct agent() call (§Script Audit Checklist › recipe-vs-script required-stage diff). Match an agent()
-# call whose description names the stage, not a // Stage: comment.
+# call whose prompt names the stage, not a // Stage: comment.
 stages=$(sed -n 's/^stages: //p' "$tmp/recipe.txt" | tr ',' ' ')
 missing=""
 for stage in $stages; do

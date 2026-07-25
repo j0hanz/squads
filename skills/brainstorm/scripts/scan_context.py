@@ -47,6 +47,9 @@ class ScanResult:
     scope_reasoning: str = ""
     unknowns: list[str] = field(default_factory=list)
     truncated: dict[str, str] = field(default_factory=dict)
+    # Per-file RAW imports, keyed by path (TASK-006 ranking input). Stripped
+    # from the JSON report in main() — it is a scoring intermediate, not output.
+    file_imports: dict[str, list[str]] = field(default_factory=dict)
 
 
 # Directories that are never useful to scan
@@ -67,6 +70,10 @@ _MAX_FILES = 5  # 5: top-N related files kept in the report; higher ranks win
 _MAX_ANALOGOUS = (
     2  # 2: only seed the Minimalist lane (sorted for run-to-run determinism)
 )
+# Candidates whose imports get read so the overlap rank has something to rank.
+# Must exceed _MAX_ANALOGOUS or the rank can only reorder the files it already
+# picked. ponytail: fixed window, widen if the Minimalist seeds look arbitrary.
+_MAX_ANALOG_CANDIDATES = 10
 
 _CONSTRAINT_PATTERNS = [
     "TODO",
@@ -284,8 +291,10 @@ def _expand_synonyms(
     seen = {n.lower() for n in nouns}
     for noun in nouns:
         for synonym in synonym_map.get(noun.lower(), []):
-            if synonym not in seen:
-                seen.add(synonym)
+            # seen holds lowercased terms — compare lowercased or a
+            # case-differing project synonym re-greps a term already covered.
+            if synonym.lower() not in seen:
+                seen.add(synonym.lower())
                 expanded.append(synonym)
     return expanded
 
@@ -304,7 +313,7 @@ def _git_log(path: str, cwd: Path) -> str:
             cwd=str(cwd),
             timeout=_SUBPROCESS_TIMEOUT,
         )
-    except FileNotFoundError, subprocess.TimeoutExpired:
+    except (FileNotFoundError, subprocess.TimeoutExpired):
         return "no history"
     if result.returncode != 0:
         return "no history"
@@ -480,11 +489,15 @@ def _shapes_from_tree(tree: ast.AST, nouns: set[str]) -> list[str]:
             if len(funcs) < 2:
                 funcs.append(node.name)
         elif (
-            isinstance(node, ast.TypeAlias)
-            and any(noun in node.name.lower() for noun in nouns)
+            # PEP 695 `type X = ...`, 3.12+. The version check short-circuits
+            # before ast.TypeAlias is looked up on older interpreters.
+            sys.version_info >= (3, 12)
+            and isinstance(node, ast.TypeAlias)
+            and any(noun in node.name.id.lower() for noun in nouns)
             and len(aliases) < 1
         ):
-            aliases.append(node.name)
+            # ast.TypeAlias.name is a Name node, not a str — .id is the label.
+            aliases.append(node.name.id)
     terms = classes + funcs + aliases
     return terms[:5]
 
@@ -576,7 +589,7 @@ def _extract_interface_shapes(file_path: Path, nouns: set[str]) -> list[str]:
             tree = ast.parse(
                 file_path.read_text(encoding="utf-8", errors="ignore")
             )
-        except SyntaxError, OSError:
+        except (SyntaxError, OSError):
             return []
         return _shapes_from_tree(tree, nouns)
 
@@ -609,7 +622,7 @@ def _extract_imports(file_path: Path) -> list[str]:
             tree = ast.parse(
                 file_path.read_text(encoding="utf-8", errors="ignore")
             )
-        except SyntaxError, OSError:
+        except (SyntaxError, OSError):
             return []
         return _imports_from_tree(tree)
 
@@ -778,21 +791,28 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     if before_files > after_files:
         result.truncated["related_files"] = f"{after_files}/{before_files}"
 
-    # Record analogous features (files found only via adjacent synonyms)
+    # Record analogous features (files found only via adjacent synonyms).
+    # The final ≤2 is a provisional pick; the TASK-006 rank below reorders it
+    # once imports are read. Reading imports for only those 2 would make the
+    # rank inert (everything else scores 0), so phase 2 reads a wider window.
     before_analog = len(adjacent_paths)
-    result.analogous_features = sorted(adjacent_paths)[:_MAX_ANALOGOUS]
+    analog_candidates = sorted(adjacent_paths)[:_MAX_ANALOG_CANDIDATES]
+    result.analogous_features = analog_candidates[:_MAX_ANALOGOUS]
     if before_analog > _MAX_ANALOGOUS:
-        result.truncated["analogous_features"] = f"{_MAX_ANALOGOUS}/{before_analog}"
+        result.truncated["analogous_features"] = (
+            f"{_MAX_ANALOGOUS}/{before_analog}"
+        )
 
     # ── Phase 2: parallel git log + constraints + shapes+imports + tests ───────
-    # shape+import futures run over matched files (≤5) PLUS adjacent files (≤2)
-    # = 7 total. Adjacent files get the combined future ONLY (no log/constraint/
-    # test futures). Totals: 5 log + 5 constraints + 7 shape+import + 5 tests = 22
-    # tasks on 20 workers (2 queue). _phase2_workers stays _MAX_FILES * 4 = 20.
+    # shape+import futures run over matched files (≤5) PLUS adjacent candidates
+    # (≤10) = 15 total. Adjacent files get the combined future ONLY (no log/
+    # constraint/test futures). Totals: 5 log + 5 constraints + 15 shape+import
+    # + 5 tests = 30 tasks on 20 workers (10 queue). Each adjacent task is one
+    # stat-guarded read, so the queue drains fast.
     _phase2_workers = (
         _MAX_FILES * 4
     )  # 20: 5 files x 4 task types (log, constraints, shapes, tests)
-    adjacent_files = result.analogous_features  # sorted list, ≤2 posix paths
+    adjacent_files = analog_candidates  # sorted list, ≤10 posix paths
     file_imports: dict[
         str, list[str]
     ] = {}  # per-file RAW imports for TASK-006
@@ -860,23 +880,25 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
                     f"Error finding test file for {file_signal.path}: {exc}"
                 )
 
-    # Expose per-file imports for TASK-006 (not a dataclass field, so asdict
-    # JSON output is unaffected). Matched + adjacent files are keyed here.
+    # Matched + adjacent-candidate files are keyed here; stripped from the JSON
+    # report in main().
     result.file_imports = file_imports
 
     # ── TASK-006: rank synonym-adjacent candidates by import-overlap ───────────
-    # Import-overlap is a RANKING signal over the synonym-adjacent pool
-    # (adjacent_paths), NOT a separate pool. The x2 synonym weight is dropped
-    # (dead logic). Candidates beyond the ≤2 processed in the pool are absent
-    # from file_imports → empty imports → overlap 0. The (-overlap, path) key
-    # is total-order, so output never depends on PYTHONHASHSEED.
+    # Import-overlap is a RANKING signal over the synonym-adjacent pool, NOT a
+    # separate pool. The x2 synonym weight is dropped (dead logic). Ranking runs
+    # over analog_candidates — the same window phase 2 read imports for — so a
+    # high-overlap file that sorts late alphabetically can still win. Candidates
+    # past the window never enter the rank; the truncated entry reports the full
+    # total. The (-overlap, path) key is total-order, so output never depends on
+    # PYTHONHASHSEED.
     matched_filtered_imports: set[str] = set()
     for f in result.related_files:
         matched_filtered_imports.update(
             _stdlib_filter(result.file_imports.get(f.path, []))
         )
     ranked = sorted(
-        adjacent_paths,
+        analog_candidates,
         key=lambda c: (
             -len(
                 set(_stdlib_filter(result.file_imports.get(c, [])))
@@ -885,10 +907,13 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
             c,
         ),
     )
-    before_analog_rerank = len(ranked)
+    # Report the full candidate total, not the ranked window — a window-sized
+    # denominator would read as "that was all of them".
     result.analogous_features = ranked[:_MAX_ANALOGOUS]
-    if before_analog_rerank > _MAX_ANALOGOUS:
-        result.truncated["analogous_features"] = f"{_MAX_ANALOGOUS}/{before_analog_rerank}"
+    if before_analog > _MAX_ANALOGOUS:
+        result.truncated["analogous_features"] = (
+            f"{_MAX_ANALOGOUS}/{before_analog}"
+        )
 
     # ── Scope signal ─────────────────────────────────────────────────────────
     crosses_boundary = len(matched_modules) > 1
@@ -919,25 +944,33 @@ def scan(nouns: list[str], cwd: Path) -> ScanResult:
     before_shapes = len(interface_deduped)
     result.interface_shapes = interface_deduped[:_MAX_INTERFACE_SHAPES]
     if before_shapes > len(result.interface_shapes):
-        result.truncated["interface_shapes"] = f"{len(result.interface_shapes)}/{before_shapes}"
+        result.truncated["interface_shapes"] = (
+            f"{len(result.interface_shapes)}/{before_shapes}"
+        )
 
     constraints_deduped = _dedupe_stable(result.constraints)
     before_constraints = len(constraints_deduped)
     result.constraints = constraints_deduped[:_MAX_CONSTRAINTS]
     if before_constraints > len(result.constraints):
-        result.truncated["constraints"] = f"{len(result.constraints)}/{before_constraints}"
+        result.truncated["constraints"] = (
+            f"{len(result.constraints)}/{before_constraints}"
+        )
 
     unknowns_deduped = _dedupe_stable(result.unknowns)
     before_unknowns = len(unknowns_deduped)
     result.unknowns = unknowns_deduped[:_MAX_UNKNOWNS]
     if before_unknowns > len(result.unknowns):
-        result.truncated["unknowns"] = f"{len(result.unknowns)}/{before_unknowns}"
+        result.truncated["unknowns"] = (
+            f"{len(result.unknowns)}/{before_unknowns}"
+        )
 
     analogous_deduped = _dedupe_stable(result.analogous_features)
     before_analog_final = len(analogous_deduped)
     result.analogous_features = analogous_deduped[:_MAX_ANALOGOUS]
     if before_analog_final > len(result.analogous_features):
-        result.truncated["analogous_features"] = f"{len(result.analogous_features)}/{before_analog_final}"
+        result.truncated["analogous_features"] = (
+            f"{len(result.analogous_features)}/{before_analog_final}"
+        )
     result.scope_reasoning = _trim_str(result.scope_reasoning, 150)
 
     return result
@@ -967,7 +1000,11 @@ def main() -> None:
     if not cwd.is_dir():
         parser.error(f"--cwd path does not exist or is not a directory: {cwd}")
     result = scan(args.nouns, cwd)
-    print(json.dumps(asdict(result), separators=(",", ":")))
+    payload = asdict(result)
+    payload.pop(
+        "file_imports", None
+    )  # scoring intermediate, not report output
+    print(json.dumps(payload, separators=(",", ":")))
 
 
 if __name__ == "__main__":

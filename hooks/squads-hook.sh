@@ -1,31 +1,23 @@
 #!/usr/bin/env bash
-# squads-plugin hook dispatcher. One rule function per <rule> subcommand, invoked as
-# `squads-hook.sh <rule>` via command-string hooks.json.
+# squads-plugin hook dispatcher. One rule function per subcommand, invoked as
+# `squads-hook.sh <rule>` from hooks.json.
 #
-# Rules:
-#   session-start   SessionStart                          — inject the squads router;
-#                   on source=compact, a lean refresher plus a <squads-state> recap of
-#                   in-flight state (debug-gate flag, last plan path). This is the only
-#                   rule whose stdout becomes context, so it owns the recap — PreCompact
-#                   runs earlier but its stdout is debug-log-only and it has no
-#                   additionalContext field, so a recap emitted there reached no one
-#   dispatch-check  PreToolUse Agent|SendMessage|Workflow — deny unresolved {{...}}
-#                   placeholders in dispatch bodies, and WARN (never deny) when an
-#                   Agent dispatch is not model haiku. Fails OPEN on any
-#                   infrastructure failure; a clean dispatch is silent by design
+#   session-start   SessionStart — inject the router; on source=compact a lean
+#                   refresher plus <squads-state> recap. Only rule whose stdout
+#                   becomes context, so it owns the recap (PreCompact stdout is
+#                   debug-log-only).
+#   dispatch-check  PreToolUse Agent|SendMessage|Workflow — deny unresolved
+#                   {{...}} placeholders; warn (never deny) on non-haiku Agent.
+#                   Fails OPEN on any infrastructure failure.
 #   pre-tool        PreToolUse Write|Edit|MultiEdit|NotebookEdit — debug-gate
-#                   (debug HARD GATE), then plan-schema (Write to a
-#                   docs/plan/*.plan.md): 7 required fields, Files: max 3 paths
+#                   (hard), then plan-schema on Write to docs/plan/*.plan.md.
 #   post-tool       PostToolUse Skill|Write|Edit|MultiEdit|NotebookEdit —
-#                   arm/lift the debug flag on Skill, and re-check plan-schema
-#                   on a docs/plan/*.plan.md. All feedback-only (exit 2 + stderr
-#                   on violation, silent exit 0 otherwise). Agent returns are
-#                   NOT shape-checked here: the Handoff Contract is prompt-
-#                   enforced (skills/squads/SKILL.md:43), and a PostToolUse deny
-#                   can't tell squads dispatches from ad-hoc Agent calls.
+#                   arm/lift the debug flag on Skill, re-check plan-schema.
+#                   Feedback-only. Agent returns are NOT shape-checked: the
+#                   Handoff Contract is prompt-enforced (skills/squads/SKILL.md:43)
+#                   and a deny here can't tell squads dispatches from ad-hoc ones.
 #
-# `set -uo pipefail` WITHOUT `-e` is intentional: grep/find return non-zero
-# legitimately and must not abort the hook. Do not add `-e`.
+# No `-e`: grep/find return non-zero legitimately and must not abort the hook.
 set -uo pipefail
 
 state_dir() { printf '%s' "${TMPDIR:-/tmp}"; }
@@ -34,27 +26,20 @@ RULE="${1:-}"
 NOTICES=""
 LAST_MSG=""
 
-# Every deny names the rule + a one-line remediation, on stderr, then exit 2.
-# Pending notices ride along: exit 2 discards stdout, so the JSON flush below
-# cannot carry them, and stderr is the only channel Claude reads on a deny.
+# Deny: rule name + remediation on stderr, exit 2. Pending notices ride along —
+# exit 2 discards stdout, so stderr is the only channel Claude reads here.
 deny() { # deny <rule> <message>
   LAST_MSG="squads $1: $2${NOTICES:+ | $NOTICES}"
   echo "$LAST_MSG" >&2
   exit 2
 }
 
-# Fail-open notices. Exit-0 stderr reaches nobody: Claude Code feeds stderr to
-# Claude only on exit 2, and shows it as a `hook error` notice only on other
-# non-zero exits — on exit 0 it is debug-log-only, so a silently degraded gate
-# announced with `echo >&2` announced it to no one. JSON `systemMessage` on
-# stdout is the exit-0 channel that reaches the user (common field, every
-# event). Not for session-start: there stdout IS the context channel, so a JSON
-# object would replace the router block instead of accompanying it.
+# Fail-open notices. Exit-0 stderr reaches nobody (Claude reads stderr only on
+# exit 2); JSON `systemMessage` on stdout is the exit-0 channel that reaches the
+# user. Not usable in session-start, where stdout IS the context channel.
 #
-# Accumulated and flushed once by the EXIT trap: a rule can raise two notices
-# (non-haiku model AND a malformed untrusted_context block), and two JSON
-# objects on stdout parse as neither — losing both, which is the bug this
-# exists to fix. The flush on an exit-2 path is harmless: exit 2 ignores stdout.
+# Accumulated and flushed once by the EXIT trap: two JSON objects on stdout parse
+# as neither, losing both. Flushing on an exit-2 path is harmless.
 notify() { # notify <message>
   NOTICES="${NOTICES:+$NOTICES }$1"
 }
@@ -62,10 +47,8 @@ flush_notices() {
   local code=$? dir
   [[ -z "$NOTICES" ]] || printf '{"systemMessage":"%s"}\n' \
     "$(printf '%s' "$NOTICES" | sed 's/\\/\\\\/g; s/"/\\"/g')"
-  # SQUADS_PERF=1 appends one line per fire. The only evidence a rule ran at
-  # all — silence is the pass signal, so an unfired hook and a clean one look
-  # identical without this. Never allowed to affect the exit status: bash
-  # preserves the pre-trap $? regardless of what the trap returns.
+  # SQUADS_PERF=1: one line per fire — the only evidence a rule ran, since
+  # silence is the pass signal. Never affects exit status ($? survives the trap).
   if [[ "${SQUADS_PERF:-0}" == "1" ]]; then
     dir="${PERF_LOG_DIR:-$HOME/.claude/squads-perf}"
     mkdir -p "$dir" 2>/dev/null &&
@@ -76,16 +59,11 @@ flush_notices() {
 }
 trap flush_notices EXIT
 
-# True if the path is markdown, sits under a test/spec directory, or has a
-# genuine test/spec basename — those stay editable while the debug-gate is up
-# (investigation notes and repro harnesses are legitimate during debugging).
-#
-# Directory check first: a test tree holds helpers, fixtures and factories whose
-# names carry no test/spec token at all (src/__tests__/user.js,
-# tests/factories.py, src/test/java/A.java), and blocking those blocks the repro
-# harness itself. Each pattern needs a literal /<dir>/, so contest/foo.go and
-# src/latest/x.go do NOT match. Basename patterns then anchor "test"/"spec" as a
-# delimited token, so latest.js / inspect.js / contest.go are NOT exempt either.
+# Markdown, test/spec directories, or test/spec basenames stay editable while the
+# debug-gate is up. Directory check first: test trees hold helpers and fixtures
+# with no test token in the name (src/__tests__/user.js, tests/factories.py).
+# Each pattern needs a literal /<dir>/ and basenames anchor test/spec as a
+# delimited token, so contest/foo.go, src/latest/x.go, inspect.js are NOT exempt.
 is_exempt_path() { # is_exempt_path <slash-normalized path> → 0 if exempt
   case "/$1" in
     */__tests__/* | */__test__/* | */tests/* | */test/* | */spec/* | */specs/*) return 0 ;;
@@ -111,11 +89,10 @@ is_plan_path() { # is_plan_path <path> → 0 if a docs/plan/*.plan.md
 # ---------- session-start ----------
 
 session_start() {
-  # Reap stale per-session state from crashed sessions (120-min horizon, flat dir).
+  # Reap stale per-session state from crashed sessions (120-min horizon).
   find "$(state_dir)" -maxdepth 1 -name 'squads-*' -mmin +120 -exec rm -f {} + 2>/dev/null || true
-  # Plain text, not notify(): SessionStart stdout is added to context verbatim,
-  # and valid JSON on stdout is parsed as hook output instead — one JSON object
-  # here would swallow the router block.
+  # Plain text, not notify(): stdout here is added to context verbatim, and valid
+  # JSON on stdout would be parsed as hook output, swallowing the router block.
   local input source="" sid=""
   input=$(cat)
   if command -v jq >/dev/null 2>&1; then
@@ -129,13 +106,10 @@ session_start() {
     echo 'squads: jq not found — every gate fails OPEN this session (placeholder, debug-gate and plan-schema checks are skipped, each with a warning). Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.'
     echo
   fi
-  # On compaction the model was already routed this session; emit a one-line
-  # refresher that preserves every routing decision without the banner/tags,
-  # followed by any in-flight state compaction would otherwise drop. This is
-  # also the only place that state recap can live: PreCompact runs earlier but
-  # its stdout goes to the debug log, never into context.
-  # startup|resume|clear (or any unknown/missing source) get the full block —
-  # fresh or reloaded context genuinely needs it. jq missing → full block.
+  # Compaction: already routed this session, so emit a one-line refresher plus
+  # in-flight state compaction would otherwise drop. Only place the recap can
+  # live — PreCompact stdout never reaches context. Any other source (or jq
+  # missing) gets the full block.
   if [[ "$source" == "compact" ]]; then
     echo '<squads-router>'
     echo 'squads routing (refresher): RED/failure -> squads:debug · diff/review feedback -> squads:review · new logic -> squads:tdd · named deliverable (plan/spec/doc) -> squads:plan · open problem -> squads:brainstorm · bulk fan-out / approved docs/plan/*.plan.md -> squads:dispatch-agents · else answer direct.'
@@ -166,27 +140,25 @@ session_start() {
 
 # ---------- dispatch-check ----------
 
-# Deny a dispatch whose body carries an unresolved {{...}} placeholder. Fails OPEN
-# on every infrastructure failure (no jq, bad payload, malformed wrap): a blocked
-# dispatch costs the whole fleet, a leaked placeholder costs one subagent. The
-# positive placeholder match is the only deny left.
+# Deny a dispatch carrying an unresolved {{...}} placeholder. Fails OPEN on every
+# infrastructure failure: a blocked dispatch costs the whole fleet, a leaked
+# placeholder costs one subagent.
 dispatch_check() {
   if ! command -v jq >/dev/null 2>&1; then
     notify "squads dispatch-check: jq not found — placeholder hygiene unverified, dispatch allowed. Install jq."
     exit 0
   fi
-  # tool/model initialized: a bare `local` leaves them UNSET, and an empty
-  # payload makes both `read`s hit EOF, so `$tool` below would abort the whole
-  # rule on `set -u` before the placeholder grep ever runs.
+  # tool/model initialized: an empty payload makes both `read`s hit EOF, and a
+  # bare `local` would leave them unset — `set -u` would abort before the grep.
   local input body placeholders tool="" model=""
-  # One stdin read; jq is called more than once below, and stdin is not rewindable.
+  # One stdin read; jq runs more than once below and stdin is not rewindable.
   input=$(cat)
-  # The dispatch body is a concatenation of all the fields that can carry placeholders. If any field is missing, it is treated as empty. The jq command extracts these fields and joins them with newlines.
+  # Body = every field that can carry a placeholder, missing ones as empty.
   body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", .tool_input.summary // "", .tool_input.to // "", .tool_input.scriptPath // "", .tool_input.name // "", (.tool_input.args // "" | tostring)] | join("\n")' <<<"$input" 2>/dev/null) ||
     { notify "squads dispatch-check: dispatch payload is not valid JSON — placeholder hygiene unverified, dispatch allowed."; exit 0; }
-  # Flat-haiku policy check (skills/squads/SKILL.md#model--fan-out-policy). Warn
-  # only, never deny — and only for Agent, the one tool that carries the param.
-  # Kept out of "$body" so a model name can never read as a placeholder.
+  # Flat-haiku policy (skills/squads/SKILL.md#model--fan-out-policy). Warn only,
+  # and only for Agent — the one tool carrying the param. Kept out of "$body" so
+  # a model name can never read as a placeholder.
   { read -r tool; read -r model; } < <(jq -r '.tool_name // "", (.tool_input.model // "")' <<<"$input" 2>/dev/null | tr -d '\r')
   if [[ "$tool" == "Agent" ]]; then
     if [[ -z "$model" ]]; then
@@ -195,11 +167,9 @@ dispatch_check() {
       notify "squads dispatch-check: model '$model' is not haiku — flat-haiku cost model void (skills/squads/SKILL.md:69)."
     fi
   fi
-  # <untrusted_context> blocks are data to analyze, never instructions — strip them
-  # before linting so wrapped third-party content can legitimately contain {{...}}.
-  # Same pass fails closed on a misordered/unclosed block (close before open, or
-  # EOF still inside one): either could smuggle a placeholder past the strip.
-  # (dispatch-check is placeholder hygiene only — it does NOT enforce routing.)
+  # <untrusted_context> is data, never instructions — strip it so wrapped
+  # third-party content can legitimately contain {{...}}. Same pass fails closed
+  # on a misordered/unclosed block: either could smuggle a placeholder past.
   body=$(awk '
     /^<untrusted_context>[[:space:]]*$/  { if (skip) { bad = 1; exit } skip = 1; next }
     /^<\/untrusted_context>[[:space:]]*$/ { if (!skip) { bad = 1; exit } skip = 0; next }
@@ -214,12 +184,11 @@ dispatch_check() {
 
 # ---------- pre-tool ----------
 
-# debug HARD GATE (pre-tool side): while squads:debug is active, non-test/non-md
-# edits are denied. Deny-only here — the flag is armed by squads:debug and lifted
-# by tdd / plan / review on the PostToolUse side (post_tool), so a rejected Skill
-# call never arms or lifts it. dispatch-agents is NOT a lift — it bypasses
-# reproduce-first. Per-session flag file, 120-min expiry backstop auto-lifts an
-# abandoned flag on the next edit attempt.
+# debug HARD GATE: while squads:debug is active, non-test/non-md edits are denied.
+# Deny-only — the flag is armed by squads:debug and lifted by tdd/plan/review in
+# post_tool, so a rejected Skill call never arms or lifts it. dispatch-agents is
+# NOT a lift (it bypasses reproduce-first). Per-session flag, 120-min expiry
+# auto-lifts an abandoned gate on the next edit attempt.
 debug_gate() { # debug_gate <tool> <sid> <file_path>
   local tool="$1" sid="$2" file_path="$3" flag
   case "$tool" in
@@ -238,10 +207,8 @@ debug_gate() { # debug_gate <tool> <sid> <file_path>
     deny debug-gate "debug active — code edits blocked. Reproduce root cause, then route: tdd (logic bug) or plan (design). review also lifts. Abandoned? remove $flag"
 }
 
-# Shared plan-schema validator: file content on stdin, first violation text on
-# stdout (empty if valid). Both pre-tool (Write deny) and post-tool
-# (feedback-only) paths route through this. Short-circuits on Origin like the
-# original inline check.
+# Shared plan-schema validator: file content on stdin, violations on stdout
+# (empty if valid). Both the pre-tool deny and post-tool feedback paths use it.
 plan_schema_violations() {
   local content missing
   content=$(cat)
@@ -249,7 +216,7 @@ plan_schema_violations() {
     printf "missing 'Origin:' header (e.g. 'Origin: plan').\n"
     return 0
   }
-  # Every ### TASK-NNN: block must carry all 7 Canonical Task Block field labels.
+  # Every ### TASK-NNN: block must carry all 7 Canonical Task Block fields.
   missing=$(awk '
     BEGIN { split("Depends on|Files|Symbols|Satisfies|Action|Validate|Expected result", a, "|"); for (i in a) want[a[i]]=1 }
     /^### TASK-[0-9]+:/ { if (id != "") emit(); match($0, /TASK-[0-9]+/); id=substr($0, RSTART, RLENGTH); delete seen; files_count=0; next }
@@ -262,8 +229,7 @@ plan_schema_violations() {
     printf '%s Each ### TASK-NNN: block needs all 7 fields (Depends on / Files / Symbols / Satisfies / Action / Validate / Expected result) and at most 3 paths in Files:.\n' "$(printf '%s' "$missing" | tr '\n' ';')"
 }
 
-# Canonical Task Block guard on Write to a docs/plan/*.plan.md. Write-only: Edit's
-# old_string/new_string is a partial view of the file, so Edit is not matched.
+# Write-only: Edit's old_string/new_string is a partial view of the file.
 plan_schema() { # plan_schema <file_path> <content>
   local file_path="$1" content="$2" violations
   is_plan_path "$file_path" || return 0
@@ -272,22 +238,20 @@ plan_schema() { # plan_schema <file_path> <content>
   return 0
 }
 
-# Consolidated PreToolUse entry: one stdin read, debug-gate (hard gate) then
-# plan-schema on Write. No jq → the flags were never set either; nothing to
-# enforce.
+# One stdin read, debug-gate then plan-schema. No jq → the flags were never set
+# either; nothing to enforce.
 pre_tool() {
   command -v jq >/dev/null 2>&1 || { notify "squads pre-tool: jq not found — debug-gate and plan-schema not applied."; exit 0; }
   local input tool="" sid="" file_path="" content=""
   input=$(cat)
-  # Single jq for scalars. `read` (bash 3.2+), NOT `mapfile` (bash 4.0+): the
-  # dispatcher must run under macOS /bin/bash 3.2, where mapfile is absent and
-  # would silently no-op every gate. jq failure → fewer lines → vars stay empty
-  # (declared above) → fail-open, no set -u abort.
+  # `read` (bash 3.2+), NOT `mapfile` (4.0+): macOS /bin/bash is 3.2, where
+  # mapfile is absent and would silently no-op every gate. jq failure → fewer
+  # lines → vars stay empty → fail-open, no set -u abort.
   { read -r tool; read -r sid; read -r file_path; } < <(
     jq -r '.tool_name // "", .session_id // "",
           (.tool_input.file_path // .tool_input.notebook_path // "")' <<<"$input" 2>/dev/null | tr -d '\r'
   )
-  # Arming/lifting is post_tool's job, so the gate does not mutate state here.
+  # Arming/lifting is post_tool's job — no state mutation here.
   debug_gate "$tool" "$sid" "$file_path"
   [[ "$tool" == "Write" ]] && {
     content=$(jq -r '.tool_input.content // ""' <<<"$input" 2>/dev/null)
@@ -298,16 +262,14 @@ pre_tool() {
 
 # ---------- post-tool ----------
 
-# PostToolUse. Two jobs, keyed off the tool that just COMPLETED (a PreToolUse
-# deny never reaches here, so a rejected Skill call cannot arm/lift a flag):
-#   Skill → arm the debug flag (squads:debug); lift it (tdd / plan / review).
-#           This is where session state is mutated — never at PreToolUse.
-#   Write|Edit|... on a docs/plan/*.plan.md → re-read the completed file and emit
-#           missing-field violations to stderr, exit 2. Feedback-only, never a
-#           deny. Silent exit 0 otherwise (missing jq, unreadable file, etc.).
+# Keyed off the tool that just COMPLETED (a PreToolUse deny never reaches here):
+#   Skill → arm (squads:debug) or lift (tdd/plan/review) the flag. Session state
+#           is mutated here, never at PreToolUse.
+#   Write|... on a docs/plan/*.plan.md → re-read the file, emit violations to
+#           stderr with exit 2. Feedback-only, never a deny.
 post_tool() {
-  # Loudly, not silently: with no jq the debug flag is never armed and never
-  # lifted, so the gate does not merely fail to block — it never exists.
+  # Loud, not silent: with no jq the flag is never armed or lifted, so the gate
+  # does not merely fail to block — it never exists.
   command -v jq >/dev/null 2>&1 || {
     notify "squads post-tool: jq not found — the debug-gate flag is never armed or lifted this session and plan-schema feedback is off. Install jq."
     exit 0
@@ -332,9 +294,8 @@ post_tool() {
   esac
   file_path=$(jq -r '.tool_input.file_path // ""' <<<"$input" 2>/dev/null)
   is_plan_path "$file_path" || exit 0
-  # Remember the last plan path touched this session so the PreCompact recap
-  # can name it after compaction. One line, reaped with the rest of squads-*
-  # by session_start's 120-min find. sid sanitized to prevent traversal.
+  # Remember the last plan path so the post-compact recap can name it. Reaped
+  # with the rest of squads-* by session_start. sid sanitized against traversal.
   local sid_for_plan
   sid_for_plan=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null)
   sid_for_plan=$(tr -cd 'a-zA-Z0-9-' <<<"$sid_for_plan" 2>/dev/null)
@@ -342,8 +303,8 @@ post_tool() {
   [[ -r "${file_path//\\//}" ]] || exit 0
   content=$(cat "${file_path//\\//}") || exit 0
   violations=$(printf '%s' "$content" | plan_schema_violations)
-  # Named + remediated like every deny, but not deny(): the write already
-  # landed, so the fix is an edit to the file on disk, not a retry.
+  # Named + remediated like a deny, but not deny(): the write already landed, so
+  # the fix is an edit to the file on disk, not a retry.
   if [[ -n "$violations" ]]; then
     printf 'squads plan-schema: %s The file is already written — edit it to add the missing fields.\n' \
       "$violations" >&2

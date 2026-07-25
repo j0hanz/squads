@@ -30,9 +30,16 @@ set -uo pipefail
 
 state_dir() { printf '%s' "${TMPDIR:-/tmp}"; }
 
+RULE="${1:-}"
+NOTICES=""
+LAST_MSG=""
+
 # Every deny names the rule + a one-line remediation, on stderr, then exit 2.
+# Pending notices ride along: exit 2 discards stdout, so the JSON flush below
+# cannot carry them, and stderr is the only channel Claude reads on a deny.
 deny() { # deny <rule> <message>
-  echo "squads $1: $2" >&2
+  LAST_MSG="squads $1: $2${NOTICES:+ | $NOTICES}"
+  echo "$LAST_MSG" >&2
   exit 2
 }
 
@@ -48,22 +55,42 @@ deny() { # deny <rule> <message>
 # (non-haiku model AND a malformed untrusted_context block), and two JSON
 # objects on stdout parse as neither — losing both, which is the bug this
 # exists to fix. The flush on an exit-2 path is harmless: exit 2 ignores stdout.
-NOTICES=""
 notify() { # notify <message>
   NOTICES="${NOTICES:+$NOTICES }$1"
 }
 flush_notices() {
+  local code=$? dir
   [[ -z "$NOTICES" ]] || printf '{"systemMessage":"%s"}\n' \
     "$(printf '%s' "$NOTICES" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+  # SQUADS_PERF=1 appends one line per fire. The only evidence a rule ran at
+  # all — silence is the pass signal, so an unfired hook and a clean one look
+  # identical without this. Never allowed to affect the exit status: bash
+  # preserves the pre-trap $? regardless of what the trap returns.
+  if [[ "${SQUADS_PERF:-0}" == "1" ]]; then
+    dir="${PERF_LOG_DIR:-$HOME/.claude/squads-perf}"
+    mkdir -p "$dir" 2>/dev/null &&
+      printf '%s %-14s exit=%s %s\n' "$(date +%H:%M:%S)" "$RULE" "$code" \
+        "${LAST_MSG:-$NOTICES}" >>"$dir/$(date +%Y-%m-%d).log" 2>/dev/null
+  fi
+  return 0
 }
 trap flush_notices EXIT
 
-# True if the given basename is markdown or a genuine test/spec file — those stay
-# editable while the debug-gate is up (investigation notes and repro harnesses are
-# legitimate during debugging). "test"/"spec" anchored as a delimited token so
-# production files like latest.js / inspect.js / contest.go are NOT exempt.
-is_exempt_path() { # is_exempt_path <basename> → 0 if exempt
-  case "$1" in
+# True if the path is markdown, sits under a test/spec directory, or has a
+# genuine test/spec basename — those stay editable while the debug-gate is up
+# (investigation notes and repro harnesses are legitimate during debugging).
+#
+# Directory check first: a test tree holds helpers, fixtures and factories whose
+# names carry no test/spec token at all (src/__tests__/user.js,
+# tests/factories.py, src/test/java/A.java), and blocking those blocks the repro
+# harness itself. Each pattern needs a literal /<dir>/, so contest/foo.go and
+# src/latest/x.go do NOT match. Basename patterns then anchor "test"/"spec" as a
+# delimited token, so latest.js / inspect.js / contest.go are NOT exempt either.
+is_exempt_path() { # is_exempt_path <slash-normalized path> → 0 if exempt
+  case "/$1" in
+    */__tests__/* | */__test__/* | */tests/* | */test/* | */spec/* | */specs/*) return 0 ;;
+  esac
+  case "${1##*/}" in
     *.md | *.MD) return 0 ;;
     test_* | *_test | *_test.* | *.test.* | *.test | \
       *_spec | *_spec.* | *.spec.* | *.spec | \
@@ -207,7 +234,7 @@ debug_gate() { # debug_gate <tool> <sid> <file_path>
     rm -f "$flag"
     return 0
   fi
-  is_exempt_path "$(basename "${file_path//\\//}")" ||
+  is_exempt_path "${file_path//\\//}" ||
     deny debug-gate "debug active — code edits blocked. Reproduce root cause, then route: tdd (logic bug) or plan (design). review also lifts. Abandoned? remove $flag"
 }
 
@@ -279,7 +306,12 @@ pre_tool() {
 #           missing-field violations to stderr, exit 2. Feedback-only, never a
 #           deny. Silent exit 0 otherwise (missing jq, unreadable file, etc.).
 post_tool() {
-  command -v jq >/dev/null 2>&1 || exit 0
+  # Loudly, not silently: with no jq the debug flag is never armed and never
+  # lifted, so the gate does not merely fail to block — it never exists.
+  command -v jq >/dev/null 2>&1 || {
+    notify "squads post-tool: jq not found — the debug-gate flag is never armed or lifted this session and plan-schema feedback is off. Install jq."
+    exit 0
+  }
   local input tool file_path content violations
   input=$(cat)
   tool=$(jq -r '.tool_name // ""' <<<"$input" 2>/dev/null)
@@ -310,8 +342,11 @@ post_tool() {
   [[ -r "${file_path//\\//}" ]] || exit 0
   content=$(cat "${file_path//\\//}") || exit 0
   violations=$(printf '%s' "$content" | plan_schema_violations)
+  # Named + remediated like every deny, but not deny(): the write already
+  # landed, so the fix is an edit to the file on disk, not a retry.
   if [[ -n "$violations" ]]; then
-    printf '%s\n' "$violations" >&2
+    printf 'squads plan-schema: %s The file is already written — edit it to add the missing fields.\n' \
+      "$violations" >&2
     exit 2
   fi
   exit 0

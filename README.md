@@ -39,9 +39,9 @@ Only [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) is mand
 | plus shell (Git Bash on Windows) | ✓       | skipped, announced                        | ✓      |
 | plus `jq`                        | ✓       | ✓                                         | ✓      |
 
-Everything else is optional. **Python 3.11+** is used by two off-path scripts only — brainstorm's `scan_context.py` (falls back to grep) and the `SQUADS_PERF=1` perf wrapper (falls back to bare bash). **Node** is for the repo's own format check, never for using the plugin. No build step.
+Everything else is optional. **Python 3.11+** is used by brainstorm's `scan_context.py` (falls back to grep) and by the repo's own hook test harness, never by the hooks themselves. **Node** is for the repo's own format check, never for using the plugin. No build step.
 
-> Internals: markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json` running bare bash by default, `SQUADS_PERF=1` opts into the Python perf wrapper, 10s PreToolUse timeout).
+> Internals: markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json`, 10s PreToolUse timeout). Every rule is silent on success, so `SQUADS_PERF=1` opts into one log line per fire under `$PERF_LOG_DIR` (default `~/.claude/squads-perf`) when you need proof a hook ran.
 
 ## Usage
 
@@ -78,7 +78,6 @@ No build step. Checks:
 npm ci && npm run format:check   # bash -n on hooks + prettier (needs Node for the formatter only)
 ruff check .                     # Python lint + the 3.11 floor (target-version in pyproject.toml)
 python -m pytest                 # scan_context suite
-python hooks/perf-hook.py --self-check        # hook dispatcher end-to-end
 bash skills/forge-workflow/references/plant-breach-drill.sh   # Script Audit HIGH items
 ```
 

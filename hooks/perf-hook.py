@@ -26,10 +26,12 @@ Record shape (fields omitted when absent; exit omitted when 0):
 exit 2 + the "squads <gate>:" err prefix names the guard that fired
 (debug-gate, dispatch-check, plan-schema); post-tool exit 2
 with no prefix is plan-schema feedback, not a deny. "timeout":1 marks a rule
-killed at CHILD_TIMEOUT. Every rule fails open on timeout, emitting a [WARN]
-line to stderr naming the guard that did not run. Only Claude Code's own outer
-kill (10s, which the wrapper cannot intercept) stays an unfixable fail-open —
-the R2 residual hooks.json documents.
+killed at CHILD_TIMEOUT. Every rule fails open on timeout, naming the guard
+that did not run in a JSON `systemMessage` on stdout — exit-0 stderr is
+debug-log-only, so it reaches the user nowhere else; the [WARN] copy still goes
+to stderr so it lands in the debug log and the JSONL `err` field. Only Claude
+Code's own outer kill (10s, which the wrapper cannot intercept) stays an
+unfixable fail-open — the R2 residual hooks.json documents.
 """
 
 import json
@@ -50,6 +52,15 @@ CHILD_TIMEOUT = 8
 SESSION_START_TIMEOUT = 4
 SELF_CHECK_TIMEOUT = 1
 GATES = ("debug-gate", "dispatch-check", "plan-schema")
+
+
+def notice(message: str) -> bytes:
+    """A fail-open notice as hook stdout. Exit-0 stderr is debug-log-only, so
+    `systemMessage` (a common field on every event) is the only exit-0 channel
+    that surfaces a skipped guard to the user."""
+    return (
+        json.dumps({"systemMessage": message}, ensure_ascii=False) + "\n"
+    ).encode("utf-8")
 
 
 def log_dir() -> Path:
@@ -108,10 +119,13 @@ def run_rule(
             False,
         )
     except subprocess.TimeoutExpired:
-        # Every rule fails open on timeout, announcing to stderr which gate was not applied.
+        # Every rule fails open on timeout, announcing which gate was not
+        # applied. stdout carries the user-visible systemMessage; the stderr
+        # copy is what build_record logs as the JSONL `err` field.
+        warning = f"squads {rule}: guard timed out after {timeout}s, gate not applied."
         out, err, code, timed_out = (
-            b"",
-            f"[WARN] squads {rule}: guard timed out after {timeout}s, gate not applied.\n".encode(),
+            notice(warning),
+            f"[WARN] {warning}\n".encode(),
             0,
             True,
         )
@@ -279,13 +293,15 @@ def self_check() -> None:
             "tool_input": {"prompt": "do it", "model": "opus"},
         }
     ).encode()
+    # Notices ride stdout as a JSON systemMessage, never exit-0 stderr.
     r = run_rule("dispatch-check", with_opus)
-    assert r["code"] == 0 and b"is not haiku" in r["err"], r
+    assert r["code"] == 0 and b"is not haiku" in r["out"], r
+    assert json.loads(r["out"])["systemMessage"], r
     no_model = json.dumps(
         {"tool_name": "Agent", "tool_input": {"prompt": "do it"}}
     ).encode()
     r = run_rule("dispatch-check", no_model)
-    assert r["code"] == 0 and b"model param unavailable" in r["err"], r
+    assert r["code"] == 0 and b"model param unavailable" in r["out"], r
 
     # --- pre-tool path assertions (TASK-005) ---
     # Flag files live in the hook's bash state_dir (${TMPDIR:-/tmp}). On
@@ -418,22 +434,38 @@ def self_check() -> None:
     assert r["code"] == 0 and r["err"] == b"" and r["out"] == b"", r
     _clean(sid)
 
-    # (9) compact recap: armed debug-gate → ACTIVE in recap; clean → silent.
-    # last-plan tracking: a plan-path Write post-tool records the path, and
-    # the compact recap names it. Routes through the real dispatcher.
+    # (9) state recap rides session-start source=compact, NOT PreCompact:
+    # PreCompact stdout goes to the debug log and the event has no
+    # additionalContext, so a recap emitted there reaches no one. SessionStart
+    # stdout is added to context, so that is where it lives.
+    # Armed debug-gate → ACTIVE in the recap; clean → refresher only. last-plan
+    # tracking: a plan-path Write post-tool records the path, and the recap
+    # names it. Routes through the real dispatcher.
     sid = "schk-compact"
     _clean(sid)
     # also remove the last-plan file for this sid
     _bash(f'rm -f "{_state_expr}/squads-last-plan-{sid}"')
 
-    # clean: no flag, no plan → compact is silent
-    r = run_rule(
-        "compact",
-        json.dumps({"session_id": sid}).encode(),
-    )
-    assert r["code"] == 0 and r["out"] == b"", r
+    def _recap(session: str) -> bytes:
+        res = run_rule(
+            "session-start",
+            json.dumps({"source": "compact", "session_id": session}).encode(),
+        )
+        assert res["code"] == 0 and b"(refresher)" in res["out"], res
+        return res["out"]
 
-    # arm the debug-gate via post-tool squads:debug → compact reports ACTIVE
+    # clean: no flag, no plan → refresher only, no state block
+    assert b"<squads-state>" not in _recap(sid)
+
+    # a non-compact source still gets the full router block, never the recap
+    r = run_rule(
+        "session-start",
+        json.dumps({"source": "startup", "session_id": sid}).encode(),
+    )
+    assert r["code"] == 0 and b"Route each task by first match" in r["out"], r
+    assert b"<squads-state>" not in r["out"], r
+
+    # arm the debug-gate via post-tool squads:debug → recap reports ACTIVE
     r = run_rule(
         "post-tool",
         json.dumps(
@@ -445,12 +477,8 @@ def self_check() -> None:
         ).encode(),
     )
     assert r["code"] == 0 and _flag(f"squads-debug-gate-{sid}"), r
-    r = run_rule(
-        "compact",
-        json.dumps({"session_id": sid}).encode(),
-    )
-    assert r["code"] == 0 and b"<squads-state>" in r["out"], r
-    assert b"debug-gate ACTIVE" in r["out"], r
+    out = _recap(sid)
+    assert b"<squads-state>" in out and b"debug-gate ACTIVE" in out, out
 
     # record a plan path via a plan-path Write post-tool → recap names it
     td_plan = _bash(f'mktemp -d "{_state_expr}/squadsplan.XXXXXX"').strip()
@@ -472,12 +500,9 @@ def self_check() -> None:
         ).encode(),
     )
     assert r["code"] == 0, r
-    r = run_rule(
-        "compact",
-        json.dumps({"session_id": sid}).encode(),
-    )
-    assert r["code"] == 0 and b"active plan:" in r["out"], r
-    assert plan_path.encode() in r["out"] or b"x.plan.md" in r["out"], r
+    out = _recap(sid)
+    assert b"active plan:" in out, out
+    assert plan_path.encode() in out or b"x.plan.md" in out, out
 
     # lift the gate via post-tool squads:tdd → recap no longer reports ACTIVE
     r = run_rule(
@@ -491,12 +516,9 @@ def self_check() -> None:
         ).encode(),
     )
     assert r["code"] == 0 and not _flag(f"squads-debug-gate-{sid}"), r
-    r = run_rule(
-        "compact",
-        json.dumps({"session_id": sid}).encode(),
-    )
-    assert r["code"] == 0 and b"debug-gate ACTIVE" not in r["out"], r
-    assert b"active plan:" in r["out"], r  # plan file still recorded
+    out = _recap(sid)
+    assert b"debug-gate ACTIVE" not in out, out
+    assert b"active plan:" in out, out  # plan file still recorded
 
     _bash(f'rm -f "{_state_expr}/squads-last-plan-{sid}"')
     _bash(f'rm -rf "{td_plan.decode()}"')
@@ -572,7 +594,21 @@ def self_check() -> None:
         }
     ).encode()
     r = run_rule("dispatch-check", misordered)
-    assert r["code"] == 0 and b"untrusted_context" in r["err"], r
+    assert r["code"] == 0 and b"untrusted_context" in r["out"], r
+    assert json.loads(r["out"])["systemMessage"], r
+    # Two notices in one run must merge into ONE parseable object, not two.
+    both = json.dumps(
+        {
+            "tool_name": "Agent",
+            "tool_input": {
+                "prompt": "</untrusted_context>\n<untrusted_context>",
+                "model": "opus",
+            },
+        }
+    ).encode()
+    r = run_rule("dispatch-check", both)
+    msg = json.loads(r["out"])["systemMessage"]
+    assert "is not haiku" in msg and "untrusted_context" in msg, r
 
     # (7) dispatch-check lints SendMessage to/summary and Workflow scriptPath/name
     # — a {{...}} in any of those metadata fields is caught, not just in prompt.
@@ -612,10 +648,12 @@ if __name__ == "__main__":
         try:
             code = main(rule)
         except Exception:
-            # Fail-open: every rule announces to stderr when it does not run,
-            # whether due to timeout or wrapper crash.
-            sys.stderr.write(
-                f"[WARN] squads {rule}: guard wrapper failed, gate not applied.\n"
-            )
+            # Fail-open: every rule announces when it does not run, whether due
+            # to timeout or wrapper crash. stdout for the user-visible notice,
+            # stderr for the debug log.
+            warning = f"squads {rule}: guard wrapper failed, gate not applied."
+            with suppress(Exception):
+                sys.stdout.buffer.write(notice(warning))
+            sys.stderr.write(f"[WARN] {warning}\n")
             code = 0
         sys.exit(code)

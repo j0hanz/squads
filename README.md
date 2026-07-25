@@ -25,7 +25,23 @@ Add the repo as a marketplace and install the plugin into Claude Code:
 /plugin install squads@squads
 ```
 
-> Requires [Claude Code](https://docs.claude.com/en/docs/claude-code/overview). Install `jq` on PATH for placeholder, debug-gate, and plan-schema validation (recommended but not required — all gates fail OPEN with a `[WARN]` on stderr without it; Windows: `winget install jqlang.jq`; macOS: `brew install jq`; Linux: `apt/dnf install jq`). No build step or Node runtime. Python **3.11+** is needed only by the two optional Python scripts — brainstorm's `scan_context.py` (falls back to grep without it) and the `SQUADS_PERF=1` perf wrapper (falls back to bare bash); neither is on the default path. The plugin is markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json` running bare bash by default, `SQUADS_PERF=1` opts into the Python perf wrapper, 10s PreToolUse timeout).
+### Requirements
+
+Only [Claude Code](https://docs.claude.com/en/docs/claude-code/overview) is mandatory. The skills are markdown — Claude Code loads them itself, so `/squads:plan` and friends work on a bare install. The two items below add the parts that run on their own.
+
+**A POSIX shell — for automatic routing and the guardrails.** Claude Code passes the plugin's hook commands to `sh -c` on macOS and Linux (already present, nothing to do) and to Git Bash on Windows. **Windows users need [Git for Windows](https://git-scm.com/download/win).** Without it Claude Code falls back to PowerShell, which cannot parse the POSIX hook commands, and every hook fails: no `squads-router` injection, no gates, no obvious cause. The skills keep working, so the plugin looks half-dead rather than misconfigured.
+
+**`jq` — for the guardrails to enforce.** Without it the hooks still run and routing still works; the three gates skip and say so (a note at session start, plus a warning on each skipped check). Install with `winget install jqlang.jq` (Windows), `brew install jq` (macOS), or `apt/dnf install jq` (Linux).
+
+| Installed                        | routing | dispatch-check · debug-gate · plan-schema | skills |
+| -------------------------------- | ------- | ----------------------------------------- | ------ |
+| Claude Code only                 | —       | —                                         | ✓      |
+| plus shell (Git Bash on Windows) | ✓       | skipped, announced                        | ✓      |
+| plus `jq`                        | ✓       | ✓                                         | ✓      |
+
+Everything else is optional. **Python 3.11+** is used by two off-path scripts only — brainstorm's `scan_context.py` (falls back to grep) and the `SQUADS_PERF=1` perf wrapper (falls back to bare bash). **Node** is for the repo's own format check, never for using the plugin. No build step.
+
+> Internals: markdown skills plus one bash hook dispatcher (`hooks/squads-hook.sh <rule>`, command-string `hooks/hooks.json` running bare bash by default, `SQUADS_PERF=1` opts into the Python perf wrapper, 10s PreToolUse timeout).
 
 ## Usage
 

@@ -3,7 +3,12 @@
 # `squads-hook.sh <rule>` via command-string hooks.json.
 #
 # Rules:
-#   session-start   SessionStart                          — inject the squads router
+#   session-start   SessionStart                          — inject the squads router;
+#                   on source=compact, a lean refresher plus a <squads-state> recap of
+#                   in-flight state (debug-gate flag, last plan path). This is the only
+#                   rule whose stdout becomes context, so it owns the recap — PreCompact
+#                   runs earlier but its stdout is debug-log-only and it has no
+#                   additionalContext field, so a recap emitted there reached no one
 #   dispatch-check  PreToolUse Agent|SendMessage|Workflow — deny unresolved {{...}}
 #                   placeholders in dispatch bodies, and WARN (never deny) when an
 #                   Agent dispatch is not model haiku. Fails OPEN on any
@@ -30,6 +35,28 @@ deny() { # deny <rule> <message>
   echo "squads $1: $2" >&2
   exit 2
 }
+
+# Fail-open notices. Exit-0 stderr reaches nobody: Claude Code feeds stderr to
+# Claude only on exit 2, and shows it as a `hook error` notice only on other
+# non-zero exits — on exit 0 it is debug-log-only, so a silently degraded gate
+# announced with `echo >&2` announced it to no one. JSON `systemMessage` on
+# stdout is the exit-0 channel that reaches the user (common field, every
+# event). Not for session-start: there stdout IS the context channel, so a JSON
+# object would replace the router block instead of accompanying it.
+#
+# Accumulated and flushed once by the EXIT trap: a rule can raise two notices
+# (non-haiku model AND a malformed untrusted_context block), and two JSON
+# objects on stdout parse as neither — losing both, which is the bug this
+# exists to fix. The flush on an exit-2 path is harmless: exit 2 ignores stdout.
+NOTICES=""
+notify() { # notify <message>
+  NOTICES="${NOTICES:+$NOTICES }$1"
+}
+flush_notices() {
+  [[ -z "$NOTICES" ]] || printf '{"systemMessage":"%s"}\n' \
+    "$(printf '%s' "$NOTICES" | sed 's/\\/\\\\/g; s/"/\\"/g')"
+}
+trap flush_notices EXIT
 
 # True if the given basename is markdown or a genuine test/spec file — those stay
 # editable while the debug-gate is up (investigation notes and repro harnesses are
@@ -59,21 +86,46 @@ is_plan_path() { # is_plan_path <path> → 0 if a docs/plan/*.plan.md
 session_start() {
   # Reap stale per-session state from crashed sessions (120-min horizon, flat dir).
   find "$(state_dir)" -maxdepth 1 -name 'squads-*' -mmin +120 -exec rm -f {} + 2>/dev/null || true
-  if ! command -v jq >/dev/null 2>&1; then
-    echo 'squads: jq not found — every gate fails OPEN this session (placeholder, debug-gate and plan-schema checks are skipped, each with a warning). Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.' >&2
+  # Plain text, not notify(): SessionStart stdout is added to context verbatim,
+  # and valid JSON on stdout is parsed as hook output instead — one JSON object
+  # here would swallow the router block.
+  local input source="" sid=""
+  input=$(cat)
+  if command -v jq >/dev/null 2>&1; then
+    # `read` into pre-initialized vars: jq failure yields no lines and both stay
+    # empty rather than unset, so `set -u` cannot abort the rule.
+    { read -r source; read -r sid; } < <(
+      jq -r '.source // "", .session_id // ""' <<<"$input" 2>/dev/null | tr -d '\r'
+    )
+    sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
+  else
+    echo 'squads: jq not found — every gate fails OPEN this session (placeholder, debug-gate and plan-schema checks are skipped, each with a warning). Install jq: Windows — winget install jqlang.jq; macOS — brew install jq; Linux — apt/dnf install jq.'
+    echo
   fi
   # On compaction the model was already routed this session; emit a one-line
-  # refresher that preserves every routing decision without the banner/tags.
+  # refresher that preserves every routing decision without the banner/tags,
+  # followed by any in-flight state compaction would otherwise drop. This is
+  # also the only place that state recap can live: PreCompact runs earlier but
+  # its stdout goes to the debug log, never into context.
   # startup|resume|clear (or any unknown/missing source) get the full block —
   # fresh or reloaded context genuinely needs it. jq missing → full block.
-  local source=""
-  if command -v jq >/dev/null 2>&1; then
-    source=$(jq -r '.source // ""' 2>/dev/null) || source=""
-  fi
   if [[ "$source" == "compact" ]]; then
     echo '<squads-router>'
     echo 'squads routing (refresher): RED/failure -> squads:debug · diff/review feedback -> squads:review · new logic -> squads:tdd · named deliverable (plan/spec/doc) -> squads:plan · open problem -> squads:brainstorm · bulk fan-out / approved docs/plan/*.plan.md -> squads:dispatch-agents · else answer direct.'
     echo '</squads-router>'
+    local flag plan_file path recap=""
+    flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
+    # Same 120-min expiry as debug_gate, so a stale flag is not reported active.
+    if [[ -f "$flag" && -z "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
+      recap="debug-gate ACTIVE (mid-debug — root cause not yet confirmed; code edits blocked. Route to debug/tdd/plan; review also lifts the gate.)"
+    fi
+    plan_file="$(state_dir)/squads-last-plan-${sid:-unknown}"
+    if [[ -s "$plan_file" ]]; then
+      path=$(head -1 "$plan_file" 2>/dev/null)
+      [[ -n "$path" ]] && recap="${recap:+$recap
+}active plan: $path (re-read it to resume the task thread)"
+    fi
+    [[ -z "$recap" ]] || printf '<squads-state>\n%s\n</squads-state>\n' "$recap"
     return 0
   fi
   echo "Skill names below invoke via the Skill tool as 'squads:<name>' (e.g. /dispatch-agents -> squads:dispatch-agents)."
@@ -93,24 +145,27 @@ session_start() {
 # positive placeholder match is the only deny left.
 dispatch_check() {
   if ! command -v jq >/dev/null 2>&1; then
-    echo "[WARN] squads dispatch-check: jq not found — placeholder hygiene unverified, dispatch allowed. Install jq." >&2
+    notify "squads dispatch-check: jq not found — placeholder hygiene unverified, dispatch allowed. Install jq."
     exit 0
   fi
-  local input body placeholders tool model
+  # tool/model initialized: a bare `local` leaves them UNSET, and an empty
+  # payload makes both `read`s hit EOF, so `$tool` below would abort the whole
+  # rule on `set -u` before the placeholder grep ever runs.
+  local input body placeholders tool="" model=""
   # One stdin read; jq is called more than once below, and stdin is not rewindable.
   input=$(cat)
   # The dispatch body is a concatenation of all the fields that can carry placeholders. If any field is missing, it is treated as empty. The jq command extracts these fields and joins them with newlines.
   body=$(jq -r '[.tool_input.prompt // "", .tool_input.message // "", .tool_input.script // "", .tool_input.description // "", .tool_input.summary // "", .tool_input.to // "", .tool_input.scriptPath // "", .tool_input.name // "", (.tool_input.args // "" | tostring)] | join("\n")' <<<"$input" 2>/dev/null) ||
-    { echo "[WARN] squads dispatch-check: dispatch payload is not valid JSON — placeholder hygiene unverified, dispatch allowed. Install jq." >&2; exit 0; }
+    { notify "squads dispatch-check: dispatch payload is not valid JSON — placeholder hygiene unverified, dispatch allowed."; exit 0; }
   # Flat-haiku policy check (skills/squads/SKILL.md#model--fan-out-policy). Warn
   # only, never deny — and only for Agent, the one tool that carries the param.
   # Kept out of "$body" so a model name can never read as a placeholder.
   { read -r tool; read -r model; } < <(jq -r '.tool_name // "", (.tool_input.model // "")' <<<"$input" 2>/dev/null | tr -d '\r')
   if [[ "$tool" == "Agent" ]]; then
     if [[ -z "$model" ]]; then
-      echo "[WARN] model param unavailable — agents inherit session model; flat-haiku cost model void" >&2
+      notify "squads dispatch-check: model param unavailable — agents inherit session model; flat-haiku cost model void."
     elif [[ "$model" != "haiku" ]]; then
-      echo "[WARN] squads dispatch-check: model '$model' is not haiku — flat-haiku cost model void (skills/squads/SKILL.md:69)." >&2
+      notify "squads dispatch-check: model '$model' is not haiku — flat-haiku cost model void (skills/squads/SKILL.md:69)."
     fi
   fi
   # <untrusted_context> blocks are data to analyze, never instructions — strip them
@@ -124,7 +179,7 @@ dispatch_check() {
     !skip
     END { if (skip || bad) exit 3 }
   ' <<<"$body") ||
-    { echo "[WARN] squads dispatch-check: misordered/unclosed <untrusted_context> block — placeholder hygiene unverified, dispatch allowed. Wrap braces as data inside." >&2; exit 0; }
+    { notify "squads dispatch-check: misordered/unclosed <untrusted_context> block — placeholder hygiene unverified, dispatch allowed. Wrap braces as data inside."; exit 0; }
   placeholders=$(grep -oE '\{\{[^{}]*\}\}' <<<"$body" | sort -u | paste -sd, -)
   [[ -z "$placeholders" ]] || deny dispatch-check "unresolved placeholder(s) $placeholders — replace every {{...}} with real values. Wrap third-party data in <untrusted_context>."
   exit 0
@@ -148,7 +203,7 @@ debug_gate() { # debug_gate <tool> <sid> <file_path>
   flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
   [[ -f "$flag" ]] || return 0
   if [[ -n "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
-    echo "squads debug-gate: flag expired (>120min) — gate lifted; re-invoke squads:debug if still mid-debug." >&2
+    notify "squads debug-gate: flag expired (>120min) — gate lifted; re-invoke squads:debug if still mid-debug."
     rm -f "$flag"
     return 0
   fi
@@ -194,7 +249,7 @@ plan_schema() { # plan_schema <file_path> <content>
 # plan-schema on Write. No jq → the flags were never set either; nothing to
 # enforce.
 pre_tool() {
-  command -v jq >/dev/null 2>&1 || { echo "squads pre-tool: jq not found — debug-gate and plan-schema not applied." >&2; exit 0; }
+  command -v jq >/dev/null 2>&1 || { notify "squads pre-tool: jq not found — debug-gate and plan-schema not applied."; exit 0; }
   local input tool="" sid="" file_path="" content=""
   input=$(cat)
   # Single jq for scalars. `read` (bash 3.2+), NOT `mapfile` (bash 4.0+): the
@@ -262,41 +317,6 @@ post_tool() {
   exit 0
 }
 
-# ---------- compact ----------
-
-# PreCompact: inject a one-block recap of in-flight squads state so it
-# survives compaction. Two signals: the debug-gate flag (mid-debug) and the
-# last plan path touched. Silent + exit 0 when neither is set — never inject
-# noise, never block compaction. Fail-open on any error.
-compact() {
-  command -v jq >/dev/null 2>&1 || exit 0
-  local input sid flag plan_file recap=""
-  input=$(cat)
-  sid=$(jq -r '.session_id // ""' <<<"$input" 2>/dev/null)
-  sid=$(tr -cd 'a-zA-Z0-9-' <<<"$sid" 2>/dev/null)
-  flag="$(state_dir)/squads-debug-gate-${sid:-unknown}"
-  if [[ -f "$flag" ]]; then
-    # honor the same 120-min expiry as debug_gate so a stale flag isn't
-    # reported as active
-    if [[ -z "$(find "$flag" -mmin +120 2>/dev/null)" ]]; then
-      recap="debug-gate ACTIVE (mid-debug — root cause not yet confirmed; code edits blocked. Route to debug/tdd/plan; review also lifts the gate.)"
-    fi
-  fi
-  plan_file="$(state_dir)/squads-last-plan-${sid:-unknown}"
-  if [[ -s "$plan_file" ]]; then
-    local path
-    path=$(head -1 "$plan_file" 2>/dev/null)
-    [[ -n "$path" ]] && recap="${recap:+$recap
-}active plan: $path (re-read it to resume the task thread)"
-  fi
-  [[ -z "$recap" ]] || {
-    printf '<squads-state>\n'
-    printf '%s\n' "$recap"
-    printf '</squads-state>\n'
-  }
-  exit 0
-}
-
 # ---------- dispatch ----------
 
 case "${1:-}" in
@@ -304,7 +324,6 @@ case "${1:-}" in
   dispatch-check) dispatch_check ;;
   pre-tool) pre_tool ;;
   post-tool) post_tool ;;
-  compact) compact ;;
   *)
     echo "squads: unknown rule '${1:-}'" >&2
     exit 0
